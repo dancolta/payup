@@ -1,0 +1,11 @@
+# Reply handling policy.
+#
+# IMPORTANT: replies are context only. Whether to STOP chasing is decided solely
+# by Wave invoice status (paid = drops out of the overdue query). A reply that
+# claims payment never silences a chase on its own.
+
+# Confidence floor below which a label is shown as "unclear" in Slack.
+min_display_confidence: 0.5
+
+# Hard rule, not configurable in v1: auto-resolve from email text is OFF.
+auto_resolve_from_reply: false

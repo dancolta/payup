@@ -1,0 +1,23 @@
+{
+  "data": {
+    "business": {
+      "id": "SANDBOX-DEMO-0001",
+      "invoices": {
+        "pageInfo": { "currentPage": 2, "totalPages": 2, "totalCount": 2 },
+        "edges": [
+          {
+            "node": {
+              "id": "inv_page2",
+              "invoiceNumber": "7002",
+              "status": "OVERDUE",
+              "dueDate": "2026-05-11",
+              "amountDue": { "value": "450.00" },
+              "currency": { "code": "USD" },
+              "customer": { "name": "Page Two Ltd", "email": "ap@pagetwo.example" }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

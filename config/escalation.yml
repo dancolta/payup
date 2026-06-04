@@ -1,0 +1,14 @@
+# Escalation policy. These are the shipped defaults (also baked into
+# EscalationConfig), exposed here so you can tune tone/timing without code.
+
+# Never chase the same invoice twice inside this many days.
+min_gap_days: 7
+
+# 1..gentle_max days overdue, with no prior reminder -> gentle nudge.
+gentle_max_days: 14
+
+# gentle_max+1..firm_max days overdue -> firm follow up.
+firm_max_days: 30
+
+# This many prior reminders forces the final tier regardless of days.
+final_min_priors: 2

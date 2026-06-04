@@ -1,0 +1,11 @@
+{
+  "data": {
+    "business": {
+      "id": "SANDBOX-DEMO-0001",
+      "invoices": {
+        "pageInfo": { "currentPage": 1, "totalPages": 1, "totalCount": 0 },
+        "edges": []
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "_comment": "Fake, public-safe demo seed. No real customers, no PII. Business id is SANDBOX-prefixed so the isolation guardrail can distinguish demo from production.",
+  "business_id": "SANDBOX-DEMO-0001",
+  "business_name": "Northwind Studio (demo)",
+  "invoices": [
+    { "invoiceNumber": "1001", "customer": "Acme Studio", "email": "ap@acmestudio.example", "amount": "2400.00", "dueDate": "2026-05-13", "status": "OVERDUE" },
+    { "invoiceNumber": "1051", "customer": "Bryce Co", "email": "accounts@bryce.example", "amount": "900.00", "dueDate": "2026-05-29", "status": "SENT" },
+    { "invoiceNumber": "0998", "customer": "Delta Labs", "email": "finance@deltalabs.example", "amount": "5100.00", "dueDate": "2026-04-27", "status": "OVERDUE" }
+  ]
+}

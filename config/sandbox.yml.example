@@ -1,0 +1,10 @@
+# Copy to config/sandbox.yml (gitignored) for the on-camera / demo run.
+# This points the bot at a FAKE Wave business with dummy overdue invoices so the
+# demo never touches real customer data.
+
+# The sandbox business id from your Wave test Business. Demo ids are prefixed
+# "SANDBOX-" so the isolation guardrail can tell demo from production.
+business_id: "SANDBOX-DEMO-0001"
+
+# Where to send the demo reminders (a test inbox you control).
+demo_inbox: "you+payup-demo@example.com"

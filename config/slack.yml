@@ -1,0 +1,13 @@
+# Slack bot behaviour.
+
+# Channel the bot posts the daily overdue batch into.
+channel: "#payup"
+
+# 24h local time for the daily overdue check (HH:MM).
+daily_at: "09:00"
+
+# Default action when a batch is posted and you say nothing: send NOTHING.
+default_action: "none"
+
+# Approve by reacting (emoji) as well as by replying.
+approve_emoji: "white_check_mark"

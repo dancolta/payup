@@ -1,0 +1,67 @@
+{
+  "data": {
+    "business": {
+      "id": "SANDBOX-DEMO-0001",
+      "invoices": {
+        "pageInfo": { "currentPage": 1, "totalPages": 1, "totalCount": 5 },
+        "edges": [
+          {
+            "node": {
+              "id": "inv_acme_1001",
+              "invoiceNumber": "1001",
+              "status": "OVERDUE",
+              "dueDate": "2026-05-13",
+              "amountDue": { "value": "2400.00" },
+              "currency": { "code": "USD" },
+              "customer": { "name": "Acme Studio", "email": "ap@acmestudio.example" }
+            }
+          },
+          {
+            "node": {
+              "id": "inv_bryce_1051",
+              "invoiceNumber": "1051",
+              "status": "SENT",
+              "dueDate": "2026-05-29",
+              "amountDue": { "value": "900.00" },
+              "currency": { "code": "USD" },
+              "customer": { "name": "Bryce Co", "email": "accounts@bryce.example" }
+            }
+          },
+          {
+            "node": {
+              "id": "inv_delta_0998",
+              "invoiceNumber": "0998",
+              "status": "OVERDUE",
+              "dueDate": "2026-04-27",
+              "amountDue": { "value": "5100.00" },
+              "currency": { "code": "USD" },
+              "customer": { "name": "Delta Labs", "email": "finance@deltalabs.example" }
+            }
+          },
+          {
+            "node": {
+              "id": "inv_paid_2000",
+              "invoiceNumber": "2000",
+              "status": "PAID",
+              "dueDate": "2026-05-01",
+              "amountDue": { "value": "0.00" },
+              "currency": { "code": "USD" },
+              "customer": { "name": "Paid Corp", "email": "ap@paidcorp.example" }
+            }
+          },
+          {
+            "node": {
+              "id": "inv_future_3000",
+              "invoiceNumber": "3000",
+              "status": "SENT",
+              "dueDate": "2026-07-01",
+              "amountDue": { "value": "1500.00" },
+              "currency": { "code": "USD" },
+              "customer": { "name": "Future Inc", "email": "billing@future.example" }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
