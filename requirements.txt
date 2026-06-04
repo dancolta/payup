@@ -1,0 +1,11 @@
+# Core engine: stdlib only (urllib + json) — nothing required here.
+# Runtime extras are installed by role:
+#   pip install -e '.[bot]'     → run the Slack bot
+#   pip install -e '.[polish]'  → optional LLM draft polish
+#   pip install -e '.[dev]'     → tests + lint
+#
+# This file exists for hosts (Fly/Railway) that expect a requirements.txt.
+# It installs the bot runtime.
+slack-bolt>=1.18
+google-api-python-client>=2.100
+google-auth-oauthlib>=1.2

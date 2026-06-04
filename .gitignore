@@ -1,0 +1,40 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Secrets & runtime state (NEVER commit) ---
+.env
+config/token.json
+config/oauth.json
+config/oauth_client.json
+config/sandbox.yml
+ledger/*.jsonl
+*.log
+
+# --- BMAD + private workflow (not for the public OSS surface) ---
+_bmad/
+_bmad-output/
+.bmad-board/
+CLAUDE.local.md
+docs/stories/
+PLAN.md
+
+# --- Claude Code local (auto-generated / private) ---
+.claude/settings.json
+.claude/settings.local.json
+.claude/hooks/
+.claude/skills/
+.claude/commands/

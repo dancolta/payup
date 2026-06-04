@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "payup"
+version = "0.1.0"
+description = "PayUp — chase overdue invoices conversationally from Slack. Replaces Bill.com's AR/reminder slice. Never moves money."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Dan Colta", email = "dan@nodesparks.com" }]
+keywords = ["invoices", "accounts-receivable", "wave", "gmail", "slack", "claude", "automation"]
+dependencies = [
+  # Core engine is stdlib-only (urllib + json). Runtime extras are optional:
+]
+
+[project.optional-dependencies]
+# The Slack bot runtime (only needed to actually run the operational bot).
+bot = [
+  "slack-bolt>=1.18",
+  "google-api-python-client>=2.100",
+  "google-auth-oauthlib>=1.2",
+]
+# Optional LLM polish of draft emails.
+polish = [
+  "anthropic>=0.40",
+]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+payup = "payup.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/dancolta/invoice-chaser"
+Issues = "https://github.com/dancolta/invoice-chaser/issues"
+
+[tool.setuptools.packages.find]
+where = ["engine"]
+include = ["payup*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["engine", "."]
+testpaths = ["engine/tests", "bot/tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
