@@ -13,9 +13,12 @@ EM_DASH = "—"
 
 
 def _iter_files():
+    # Scope: shipped tool output + docs. Test files are not user-facing.
     for d in SCAN_DIRS:
         base = os.path.join(REPO, d)
         for root, _, files in os.walk(base):
+            if f"{os.sep}tests" in root or root.endswith("tests"):
+                continue
             for f in files:
                 if os.path.splitext(f)[1] in EXTS:
                     yield os.path.join(root, f)

@@ -1,0 +1,66 @@
+"""Story E1 : NL intent parsing."""
+
+from bot.intents import parse_intent
+
+BATCH = [
+    {"n": 1, "customer": "Acme Studio"},
+    {"n": 2, "customer": "Bryce Co"},
+    {"n": 3, "customer": "Delta Labs"},
+]
+
+
+def test_send_specific_numbers():
+    i = parse_intent("send 1 and 3", BATCH)
+    assert i.kind == "send" and i.ids == (1, 3) and not i.all
+
+
+def test_send_comma_list():
+    i = parse_intent("send 1,2", BATCH)
+    assert i.kind == "send" and i.ids == (1, 2)
+
+
+def test_send_all():
+    i = parse_intent("send all", BATCH)
+    assert i.kind == "send" and i.all is True
+
+
+def test_skip_by_name():
+    i = parse_intent("skip Delta", BATCH)
+    assert i.kind == "skip" and i.ids == (3,)
+
+
+def test_send_by_name():
+    i = parse_intent("send acme", BATCH)
+    assert i.kind == "send" and i.ids == (1,)
+
+
+def test_show_overdue():
+    assert parse_intent("show overdue", BATCH).kind == "show_overdue"
+    assert parse_intent("what's overdue?", BATCH).kind == "show_overdue"
+
+
+def test_help():
+    assert parse_intent("help", BATCH).kind == "help"
+
+
+def test_junk_is_unknown():
+    assert parse_intent("lol thanks", BATCH).kind == "unknown"
+
+
+def test_bare_send_is_unknown_not_implicit():
+    # "send" with no target must NOT become an implicit send-all
+    i = parse_intent("send", BATCH)
+    assert i.kind == "unknown"
+
+
+def test_conflicting_send_and_skip_is_unknown():
+    assert parse_intent("send 1 but skip 2", BATCH).kind == "unknown"
+
+
+def test_out_of_range_numbers_ignored():
+    # 9 is not a valid row -> no resolvable target -> unknown
+    assert parse_intent("send 9", BATCH).kind == "unknown"
+
+
+def test_empty_is_unknown():
+    assert parse_intent("", BATCH).kind == "unknown"
