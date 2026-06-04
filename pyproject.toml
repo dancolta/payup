@@ -36,8 +36,8 @@ dev = [
 payup = "payup.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/dancolta/invoice-chaser"
-Issues = "https://github.com/dancolta/invoice-chaser/issues"
+Homepage = "https://github.com/dancolta/payup"
+Issues = "https://github.com/dancolta/payup/issues"
 
 [tool.setuptools.packages.find]
 where = ["engine"]
