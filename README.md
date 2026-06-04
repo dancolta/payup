@@ -20,6 +20,23 @@ Gmail sent-history (dedupe)─┘                                       (resolve
 - **Gmail sent-history** is the memory: a search keyed on the invoice number gives the prior-reminder count (for escalation) and the last-sent date (so we never re-nag inside `min_gap_days`).
 - **Templates** produce the draft with no API key and no cost. An optional Claude polish is available if you set `ANTHROPIC_API_KEY`.
 
+## What runs automatically (and what does not)
+
+The bot runs a daily timer on its always-on host. When it fires it **prepares and posts** the overdue batch to Slack, then stops. It does **not** send anything on its own.
+
+| Automatic (no input from you) | Your call, every time |
+|---|---|
+| detect overdue-and-unpaid invoices in Wave | approving a send |
+| pick the tier (gentle / firm / final) | |
+| draft the reminder | |
+| skip anything chased inside `min_gap_days` | |
+| drop invoices Wave marks paid | |
+| post the batch to Slack on schedule | |
+
+So "runs on a schedule" means it does all the busywork daily and hands you a ready-to-approve batch. The actual Gmail send always waits for you to say `send all` or `send 1 and 3`. Nothing reaches a client unsupervised.
+
+> The scheduler calls `refresh` (post the batch), never `execute` (send). See [bot/scheduler.py](bot/scheduler.py).
+
 ## What it will never do
 
 No payment rails. No moving money. No collections or legal escalation. The "final" tier is firm but never threatens. It chases; it never pays. These are enforced by tests, not just intentions.
