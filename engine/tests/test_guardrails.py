@@ -11,7 +11,6 @@ import json
 import os
 
 import pytest
-
 from payup import cli
 from payup.lib import gmail, ledger
 from payup.lib.escalation import Tier

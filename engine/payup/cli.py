@@ -20,19 +20,40 @@ from .lib.wave import Invoice
 
 
 def _load_invoices_from_json(path: str, *, now: date) -> list[Invoice]:
+    """Load invoices from either a Wave GraphQL response or the friendly sandbox
+    seed shape (top-level `invoices` list). Filters to overdue-and-unpaid."""
     from .lib.wave import _parse_invoice  # reuse the same parser
 
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
+
+    nodes: list[dict] = []
     edges = (
         data.get("data", {})
         .get("business", {})
         .get("invoices", {})
         .get("edges", [])
     )
+    if edges:
+        nodes = [edge.get("node", {}) for edge in edges]
+    else:
+        # Friendly sandbox seed: {"invoices": [{invoiceNumber, customer, email, amount, dueDate, status}]}
+        for raw in data.get("invoices", []):
+            nodes.append(
+                {
+                    "id": f"seed_{raw.get('invoiceNumber')}",
+                    "invoiceNumber": raw.get("invoiceNumber"),
+                    "status": raw.get("status", "SENT"),
+                    "dueDate": raw.get("dueDate"),
+                    "amountDue": {"value": raw.get("amount", "0")},
+                    "currency": {"code": raw.get("currency", "USD")},
+                    "customer": {"name": raw.get("customer", ""), "email": raw.get("email", "")},
+                }
+            )
+
     out = []
-    for edge in edges:
-        inv = _parse_invoice(edge.get("node", {}))
+    for node in nodes:
+        inv = _parse_invoice(node)
         if inv.is_paid or inv.due_date >= now:
             continue
         out.append(inv)

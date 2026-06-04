@@ -6,7 +6,7 @@ Full path with Wave + Gmail both mocked: fetch -> prior -> plan -> approve -> se
 import copy
 from datetime import date
 
-from payup.lib import gmail, runner, wave
+from payup.lib import runner, wave
 from payup.lib.planner import Action, Skip
 
 from .conftest import FakeGmail, epoch_ms, load_fixture

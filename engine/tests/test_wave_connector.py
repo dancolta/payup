@@ -6,7 +6,6 @@ The mock seam is wave._post_graphql; net is never reached.
 from datetime import date
 
 import pytest
-
 from payup.lib import net, wave
 from payup.lib.wave import WaveAuthError, WaveError, list_overdue_unpaid
 

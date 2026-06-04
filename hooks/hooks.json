@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'PayUp loaded. HITL on: nothing sends without your approval. Scheduling is handled by the always-on Slack bot, not this session. Run /payup-setup to wire it up or /chase-invoices for a dry-run.'"
+          }
+        ]
+      }
+    ]
+  }
+}

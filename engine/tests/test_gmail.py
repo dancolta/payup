@@ -3,7 +3,6 @@
 from datetime import date
 
 import pytest
-
 from payup.lib import gmail
 from payup.lib.escalation import Tier
 from payup.lib.gmail import NotApprovedError, build_search_query, prior_reminders, send_message

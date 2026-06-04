@@ -11,8 +11,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from . import gmail
-from . import wave
+from . import gmail, wave
 from .planner import Action, PayupConfig, Skip, plan_chase
 
 __all__ = ["build_plan", "execute"]

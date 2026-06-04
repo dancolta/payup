@@ -4,10 +4,9 @@ import os
 from datetime import date
 
 import pytest
-
 from payup.lib import ledger, net, output
 from payup.lib.escalation import Tier
-from payup.lib.planner import Action, Skip
+from payup.lib.planner import Action
 from payup.lib.templating import render_email
 from payup.lib.wave import Invoice
 

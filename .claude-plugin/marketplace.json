@@ -1,0 +1,22 @@
+{
+  "name": "payup-local",
+  "owner": {
+    "name": "dancolta"
+  },
+  "metadata": {
+    "description": "Local dev marketplace for the PayUp plugin",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "payup",
+      "source": "./",
+      "description": "Chase overdue invoices conversationally from Slack. Wave + Gmail, HITL, never moves money.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Dan Colta"
+      },
+      "category": "workflow"
+    }
+  ]
+}

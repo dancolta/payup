@@ -29,7 +29,7 @@ class EscalationConfig:
     final_min_priors: int = 2      # this many prior reminders forces final
 
     @classmethod
-    def load(cls, path: str | None = None) -> "EscalationConfig":
+    def load(cls, path: str | None = None) -> EscalationConfig:
         """Load from a YAML file if pyyaml + path are available, else defaults."""
         if not path:
             return cls()

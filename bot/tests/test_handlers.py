@@ -4,9 +4,9 @@ HITL gate holds: nothing sends without an explicit send intent."""
 from datetime import date
 
 import pytest
+from payup.lib import wave
 
 from bot.handlers import BotDeps, ChaseSession
-from payup.lib import wave
 
 from .conftest import load_wave
 

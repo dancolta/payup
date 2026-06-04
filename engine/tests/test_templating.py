@@ -3,7 +3,6 @@
 from datetime import date
 
 import pytest
-
 from payup.lib.escalation import Tier
 from payup.lib.templating import BLACKLIST, TemplatingConfig, render_email
 from payup.lib.wave import Invoice

@@ -2,9 +2,10 @@
 
 from datetime import date, datetime
 
+from payup.lib import wave
+
 from bot.handlers import BotDeps, ChaseSession
 from bot.scheduler import run_daily, seconds_until
-from payup.lib import wave
 
 from .conftest import load_wave
 

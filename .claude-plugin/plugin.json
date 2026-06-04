@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "payup",
+  "displayName": "PayUp",
+  "version": "0.1.0",
+  "description": "Chase overdue invoices conversationally from Slack. Reads overdue-and-unpaid invoices from Wave, drafts tiered reminders (gentle, firm, final), sends via Gmail behind a human-in-the-loop gate, and stops automatically when Wave marks the invoice paid. Replaces the AR/reminder slice of Bill.com. Never moves money. Setup in Claude Code; operate from Slack.",
+  "author": {
+    "name": "Dan Colta",
+    "url": "https://github.com/dancolta"
+  },
+  "homepage": "https://github.com/dancolta/invoice-chaser",
+  "repository": "https://github.com/dancolta/invoice-chaser",
+  "license": "MIT",
+  "keywords": [
+    "invoices",
+    "accounts-receivable",
+    "overdue-invoices",
+    "wave-accounting",
+    "gmail",
+    "slack-bot",
+    "payment-reminders",
+    "bill-com-alternative",
+    "claude-code",
+    "claude-code-plugin"
+  ],
+  "userConfig": {
+    "wave_api_token": {
+      "type": "string",
+      "title": "Wave API token",
+      "description": "Full-access GraphQL bearer token from https://developer.waveapps.com. Read-only use: PayUp only lists invoices, it never mutates Wave.",
+      "sensitive": true
+    },
+    "wave_business_id": {
+      "type": "string",
+      "title": "Wave business id",
+      "description": "The business whose invoices to chase. Use a SANDBOX- prefixed id for the demo."
+    },
+    "gmail_token_path": {
+      "type": "string",
+      "title": "Gmail token path",
+      "description": "Path to the OAuth token produced by engine/scripts/gmail_oauth_setup.py (default config/token.json). Gitignored."
+    }
+  }
+}
