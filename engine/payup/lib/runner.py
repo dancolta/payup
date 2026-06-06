@@ -11,8 +11,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from . import gmail, wave
+from . import gmail
 from .planner import Action, PayupConfig, Skip, plan_chase
+from .sources import get_source
 
 __all__ = ["build_plan", "execute"]
 
@@ -20,16 +21,22 @@ __all__ = ["build_plan", "execute"]
 def build_plan(
     *,
     now: date,
-    wave_token: str,
+    token: str,
     business_id: str,
+    source_name: str | None = None,
     gmail_creds=None,
     gmail_transport=None,
     lookback_days: int = 7,
     cfg: PayupConfig | None = None,
 ) -> list[Action | Skip]:
-    """Fetch overdue-unpaid invoices and join with Gmail send-history into a plan."""
+    """Fetch overdue-unpaid invoices and join with Gmail send-history into a plan.
+
+    `source_name` selects the invoice connector (default QuickBooks; "wave" also
+    available). `token`/`business_id` are that source's credentials.
+    """
     cfg = cfg or PayupConfig()
-    invoices = wave.list_overdue_unpaid(wave_token, business_id, now=now)
+    source_fn = get_source(source_name)
+    invoices = source_fn(token, business_id, now=now)
     prior_by_invoice: dict[str, list[date]] = {}
     for inv in invoices:
         refs = gmail.prior_reminders(

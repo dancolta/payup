@@ -24,7 +24,7 @@ def test_full_loop_send_two_skip_one(monkeypatch):
     fake = FakeGmail(search_results=[])  # no prior reminders for anyone
 
     plan = runner.build_plan(
-        now=NOW, wave_token="t", business_id="SANDBOX-DEMO-0001", gmail_transport=fake
+        now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake
     )
     actions = [p for p in plan if isinstance(p, Action)]
     assert len(actions) == 3  # 1001, 1051, 0998
@@ -41,7 +41,7 @@ def test_full_loop_send_two_skip_one(monkeypatch):
 def test_nothing_sends_without_approval(monkeypatch):
     _wire_wave(monkeypatch)
     fake = FakeGmail(search_results=[])
-    plan = runner.build_plan(now=NOW, wave_token="t", business_id="SANDBOX-DEMO-0001", gmail_transport=fake)
+    plan = runner.build_plan(now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake)
     sent, skipped = runner.execute(plan, approved_ids=set(), gmail_transport=fake, dry_run=False)
     assert sent == []
     assert fake.sent == []  # zero sends with an empty approval set
@@ -59,7 +59,7 @@ def test_no_double_chase_within_gap(monkeypatch):
             return []
 
     fake = PerInvoiceGmail()
-    plan = runner.build_plan(now=NOW, wave_token="t", business_id="SANDBOX-DEMO-0001", gmail_transport=fake)
+    plan = runner.build_plan(now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake)
     by_num = {p.invoice.invoice_number: p for p in plan}
     assert isinstance(by_num["1001"], Skip)  # chased 2 days ago, within min_gap
     assert isinstance(by_num["0998"], Action)  # never chased
@@ -75,7 +75,7 @@ def test_resolve_on_paid(monkeypatch):
     _wire_wave(monkeypatch, data=data)
 
     fake = FakeGmail(search_results=[])
-    plan = runner.build_plan(now=NOW, wave_token="t", business_id="SANDBOX-DEMO-0001", gmail_transport=fake)
+    plan = runner.build_plan(now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake)
     numbers = {p.invoice.invoice_number for p in plan}
     assert "1001" not in numbers  # paid -> no chase, resolved implicitly
 
@@ -95,11 +95,11 @@ def test_second_run_after_send_does_not_resend(monkeypatch):
 
     fake = StatefulGmail()
 
-    plan1 = runner.build_plan(now=NOW, wave_token="t", business_id="SANDBOX-DEMO-0001", gmail_transport=fake)
+    plan1 = runner.build_plan(now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake)
     delta = next(p for p in plan1 if p.invoice.invoice_number == "0998")
     runner.execute(plan1, {delta.invoice.invoice_id}, gmail_transport=fake, dry_run=False)
     state["sent_998"] = True
 
-    plan2 = runner.build_plan(now=NOW, wave_token="t", business_id="SANDBOX-DEMO-0001", gmail_transport=fake)
+    plan2 = runner.build_plan(now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake)
     by_num = {p.invoice.invoice_number: p for p in plan2}
     assert isinstance(by_num["0998"], Skip)  # already chased today

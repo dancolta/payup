@@ -1,0 +1,59 @@
+{
+  "QueryResponse": {
+    "startPosition": 1,
+    "maxResults": 5,
+    "Invoice": [
+      {
+        "Id": "130",
+        "DocNumber": "1001",
+        "DueDate": "2026-05-13",
+        "Balance": 2400.00,
+        "TotalAmt": 2400.00,
+        "CurrencyRef": { "value": "USD" },
+        "CustomerRef": { "value": "58", "name": "Acme Studio" },
+        "BillEmail": { "Address": "ap@acmestudio.example" }
+      },
+      {
+        "Id": "131",
+        "DocNumber": "1051",
+        "DueDate": "2026-05-29",
+        "Balance": 900.00,
+        "TotalAmt": 900.00,
+        "CurrencyRef": { "value": "USD" },
+        "CustomerRef": { "value": "59", "name": "Bryce Co" },
+        "BillEmail": { "Address": "accounts@bryce.example" }
+      },
+      {
+        "Id": "132",
+        "DocNumber": "0998",
+        "DueDate": "2026-04-27",
+        "Balance": 5100.00,
+        "TotalAmt": 5100.00,
+        "CurrencyRef": { "value": "USD" },
+        "CustomerRef": { "value": "60", "name": "Delta Labs" },
+        "BillEmail": { "Address": "finance@deltalabs.example" }
+      },
+      {
+        "Id": "133",
+        "DocNumber": "2000",
+        "DueDate": "2026-05-01",
+        "Balance": 0,
+        "TotalAmt": 1200.00,
+        "CurrencyRef": { "value": "USD" },
+        "CustomerRef": { "value": "61", "name": "Paid Corp" },
+        "BillEmail": { "Address": "ap@paidcorp.example" }
+      },
+      {
+        "Id": "134",
+        "DocNumber": "3000",
+        "DueDate": "2026-07-01",
+        "Balance": 1500.00,
+        "TotalAmt": 1500.00,
+        "CurrencyRef": { "value": "USD" },
+        "CustomerRef": { "value": "62", "name": "Future Inc" },
+        "BillEmail": { "Address": "billing@future.example" }
+      }
+    ]
+  },
+  "time": "2026-06-04T09:00:00.000-07:00"
+}

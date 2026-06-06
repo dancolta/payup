@@ -18,7 +18,8 @@ CH = "C123"
 def session(monkeypatch, fake_gmail):
     monkeypatch.setattr(wave, "_post_graphql", lambda token, query, variables: load_wave())
     deps = BotDeps(
-        wave_token="t",
+        token="t",
+        source_name="wave",
         business_id="SANDBOX-DEMO-0001",
         dry_run=False,
         gmail_transport=fake_gmail,

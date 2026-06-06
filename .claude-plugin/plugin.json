@@ -3,7 +3,7 @@
   "name": "payup",
   "displayName": "PayUp",
   "version": "0.1.0",
-  "description": "Chase overdue invoices conversationally from Slack. Reads overdue-and-unpaid invoices from Wave, drafts tiered reminders (gentle, firm, final), sends via Gmail behind a human-in-the-loop gate, and stops automatically when Wave marks the invoice paid. Replaces the AR/reminder slice of Bill.com. Never moves money. Setup in Claude Code; operate from Slack.",
+  "description": "Chase overdue invoices conversationally from Slack. Reads overdue-and-unpaid invoices from QuickBooks (or Wave), drafts tiered reminders (gentle, firm, final), sends via Gmail behind a human-in-the-loop gate, and stops automatically when the invoice is marked paid. Replaces the AR/reminder slice of Bill.com. Never moves money. Setup in Claude Code; operate from Slack.",
   "author": {
     "name": "Dan Colta",
     "url": "https://github.com/dancolta"
@@ -15,6 +15,7 @@
     "invoices",
     "accounts-receivable",
     "overdue-invoices",
+    "quickbooks",
     "wave-accounting",
     "gmail",
     "slack-bot",
@@ -24,16 +25,16 @@
     "claude-code-plugin"
   ],
   "userConfig": {
-    "wave_api_token": {
+    "qbo_access_token": {
       "type": "string",
-      "title": "Wave API token",
-      "description": "Full-access GraphQL bearer token from https://developer.waveapps.com. Read-only use: PayUp only lists invoices, it never mutates Wave.",
+      "title": "QuickBooks access token",
+      "description": "OAuth access token for QuickBooks Online (scope com.intuit.quickbooks.accounting). Read-only use: PayUp only queries invoices, it never mutates QuickBooks.",
       "sensitive": true
     },
-    "wave_business_id": {
+    "qbo_realm_id": {
       "type": "string",
-      "title": "Wave business id",
-      "description": "The business whose invoices to chase. Use a SANDBOX- prefixed id for the demo."
+      "title": "QuickBooks realm (company) id",
+      "description": "The sandbox or production company id whose invoices to chase."
     },
     "gmail_token_path": {
       "type": "string",

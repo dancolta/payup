@@ -34,8 +34,13 @@ def _load_gmail_creds():  # pragma: no cover - requires google libs + a real tok
 
 
 def _build_deps() -> BotDeps:  # pragma: no cover
-    wave_token = os.environ["WAVE_API_TOKEN"]
-    business_id = os.environ["WAVE_BUSINESS_ID"]
+    source = os.environ.get("PAYUP_SOURCE", "quickbooks").lower()
+    if source in ("quickbooks", "qbo"):
+        token = os.environ["QBO_ACCESS_TOKEN"]
+        business_id = os.environ["QBO_REALM_ID"]
+    else:  # wave (US/CA only)
+        token = os.environ["WAVE_API_TOKEN"]
+        business_id = os.environ["WAVE_BUSINESS_ID"]
     dry_run = os.environ.get("PAYUP_LIVE", "0") != "1"
     cfg = PayupConfig(
         templating=TemplatingConfig(
@@ -44,8 +49,9 @@ def _build_deps() -> BotDeps:  # pragma: no cover
         )
     )
     return BotDeps(
-        wave_token=wave_token,
+        token=token,
         business_id=business_id,
+        source_name=source,
         cfg=cfg,
         lookback_days=int(os.environ.get("PAYUP_MIN_GAP_DAYS", "7")),
         dry_run=dry_run,

@@ -2,21 +2,21 @@
 
 > Replace Bill.com's AR/reminder slice with a near-$0 tool wired to your real stack. **It never moves money.**
 
-PayUp watches **Wave** for invoices that are overdue *and still unpaid*, drafts escalating-but-polite reminders (gentle, firm, final), and sends them via **Gmail**, but only after you approve, conversationally, from **Slack**. When Wave marks an invoice paid, chasing stops automatically.
+PayUp watches **QuickBooks** for invoices that are overdue *and still unpaid*, drafts escalating-but-polite reminders (gentle, firm, final), and sends them via **Gmail**, but only after you approve, conversationally, from **Slack**. When the invoice is marked paid, chasing stops automatically. (Wave is supported too, for US/Canada businesses.)
 
-- **Set it up in Claude Code.** Wire your Wave token, Gmail, and tiers with the `/payup-setup` skill.
+- **Set it up in Claude Code.** Wire your QuickBooks token, Gmail, and tiers with the `/payup-setup` skill.
 - **Run it from Slack.** An always-on bot posts your overdue batch; you reply `send 1 and 3`, `skip Delta`, or `show overdue`. Nothing sends until you say so.
-- **No database.** Wave and Gmail are the source of truth.
+- **No database.** Your accounting tool and Gmail are the source of truth.
 
 ## How it works
 
 ```
-Wave (overdue + unpaid)   ─┐
-                            ├─→ planner → tiered draft → Slack batch → you approve → Gmail send
-Gmail sent-history (dedupe)─┘                                       (resolve = Wave marks it paid)
+QuickBooks (overdue + unpaid) ─┐
+                                ├─→ planner → tiered draft → Slack batch → you approve → Gmail send
+Gmail sent-history (dedupe)   ─┘                                       (resolve = invoice marked paid)
 ```
 
-- **Wave** says who is overdue and still unpaid. A paid invoice drops out of the query, so chasing resolves itself. This is authoritative, not a guess from a reply that says "paid".
+- **QuickBooks** says who is overdue and still unpaid (Balance > 0, past due). A paid invoice drops out of the query, so chasing resolves itself. This is authoritative, not a guess from a reply that says "paid". Swappable: `PAYUP_SOURCE=wave` uses Wave instead.
 - **Gmail sent-history** is the memory: a search keyed on the invoice number gives the prior-reminder count (for escalation) and the last-sent date (so we never re-nag inside `min_gap_days`).
 - **Templates** produce the draft with no API key and no cost. An optional Claude polish is available if you set `ANTHROPIC_API_KEY`.
 
@@ -26,11 +26,11 @@ The bot runs a daily timer on its always-on host. When it fires it **prepares an
 
 | Automatic (no input from you) | Your call, every time |
 |---|---|
-| detect overdue-and-unpaid invoices in Wave | approving a send |
+| detect overdue-and-unpaid invoices in QuickBooks | approving a send |
 | pick the tier (gentle / firm / final) | |
 | draft the reminder | |
 | skip anything chased inside `min_gap_days` | |
-| drop invoices Wave marks paid | |
+| drop invoices that get marked paid | |
 | post the batch to Slack on schedule | |
 
 So "runs on a schedule" means it does all the busywork daily and hands you a ready-to-approve batch. The actual Gmail send always waits for you to say `send all` or `send 1 and 3`. Nothing reaches a client unsupervised.
@@ -51,10 +51,12 @@ Copy `.env.example` to `.env` and fill in:
 
 | Secret | Where it comes from |
 |---|---|
-| `WAVE_API_TOKEN`, `WAVE_BUSINESS_ID` | https://developer.waveapps.com (free, create a sandbox Business) |
+| `QBO_ACCESS_TOKEN`, `QBO_REALM_ID` | https://developer.intuit.com (free sandbox company + OAuth Playground token) |
 | Gmail OAuth (`config/token.json`) | run `python engine/scripts/gmail_oauth_setup.py` once |
 | `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` | https://api.slack.com/apps (enable Socket Mode) |
 | `ANTHROPIC_API_KEY` *(optional)* | only if you want LLM-polished wording |
+
+> Using Wave instead (US/Canada only)? Set `PAYUP_SOURCE=wave` and provide `WAVE_API_TOKEN` + `WAVE_BUSINESS_ID`.
 
 ### 3. Preview without sending
 ```bash

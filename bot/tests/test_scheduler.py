@@ -15,7 +15,8 @@ NOW = date(2026, 6, 4)
 def test_run_daily_posts_and_sends_nothing(monkeypatch, fake_gmail, poster):
     monkeypatch.setattr(wave, "_post_graphql", lambda token, query, variables: load_wave())
     deps = BotDeps(
-        wave_token="t",
+        token="t",
+        source_name="wave",
         business_id="SANDBOX-DEMO-0001",
         dry_run=False,
         gmail_transport=fake_gmail,

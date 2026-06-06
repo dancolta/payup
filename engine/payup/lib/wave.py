@@ -14,11 +14,11 @@ against a real business; until then the shipped fixtures encode that shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from . import net
+from .models import Invoice
 
 __all__ = [
     "Invoice",
@@ -31,8 +31,6 @@ __all__ = [
 
 ENDPOINT = "https://gql.waveapps.com/graphql/public"
 
-# Wave invoice status enum values that mean "settled, stop chasing".
-_PAID_STATUSES = {"PAID"}
 _PAGE_SIZE = 50
 
 _OVERDUE_QUERY = """
@@ -68,22 +66,6 @@ class WaveAuthError(WaveError):
 
 class WaveAPIError(WaveError):
     """Wave returned a non-auth error or a GraphQL `errors` array."""
-
-
-@dataclass(frozen=True)
-class Invoice:
-    invoice_id: str
-    invoice_number: str
-    customer_name: str
-    customer_email: str
-    amount_due_cents: int
-    currency: str
-    due_date: date
-    status: str
-
-    @property
-    def is_paid(self) -> bool:
-        return self.status.upper() in _PAID_STATUSES or self.amount_due_cents <= 0
 
 
 def _post_graphql(token: str, query: str, variables: dict) -> dict:

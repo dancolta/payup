@@ -36,8 +36,9 @@ CLARIFY_TEXT = (
 
 @dataclass
 class BotDeps:
-    wave_token: str
+    token: str
     business_id: str
+    source_name: str = "quickbooks"
     cfg: PayupConfig = field(default_factory=PayupConfig)
     lookback_days: int = 7
     dry_run: bool = True
@@ -76,8 +77,9 @@ class ChaseSession:
     def refresh(self, channel: str) -> str:
         plan = runner.build_plan(
             now=self.deps.now(),
-            wave_token=self.deps.wave_token,
+            token=self.deps.token,
             business_id=self.deps.business_id,
+            source_name=self.deps.source_name,
             gmail_creds=self.deps.gmail_creds,
             gmail_transport=self.deps.gmail_transport,
             lookback_days=self.deps.lookback_days,

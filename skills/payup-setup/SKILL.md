@@ -1,6 +1,6 @@
 ---
 name: payup-setup
-description: One-time setup wizard for PayUp, the overdue-invoice chaser. Walks through wiring a Wave API token, running Gmail OAuth, verifying the Wave sandbox (Gate 0), configuring escalation tiers, and deploying the always-on Slack bot. Use when the user says "set up payup", "/payup-setup", "configure invoice chaser", "connect wave", or is installing PayUp for the first time.
+description: One-time setup wizard for PayUp, the overdue-invoice chaser. Walks through wiring a QuickBooks (or Wave) API token, running Gmail OAuth, verifying the sandbox (Gate 0), configuring escalation tiers, and deploying the always-on Slack bot. Use when the user says "set up payup", "/payup-setup", "configure invoice chaser", "connect quickbooks", or is installing PayUp for the first time.
 allowed-tools: Bash, Read, Edit
 ---
 
@@ -8,22 +8,28 @@ allowed-tools: Bash, Read, Edit
 
 Set up PayUp end to end. Operate it day to day from Slack; this wizard is the one-time wiring inside Claude Code.
 
-PayUp is **state-light**: Wave tells us who is overdue and unpaid (and resolves a chase when it marks the invoice paid), Gmail's sent history is the dedupe memory. There is no database. PayUp **never moves money**.
+PayUp is **state-light**: your accounting tool tells us who is overdue and unpaid (and resolves a chase when the invoice is marked paid), Gmail's sent history is the dedupe memory. There is no database. PayUp **never moves money**.
 
 ## Steps
 
 Run these in order. Confirm each before moving on.
 
-### 1. Wave token + sandbox (Gate 0)
-- Create a free Wave account and a sandbox Business at https://developer.waveapps.com, add a few dummy invoices with past due dates (use a `SANDBOX-` business id for the demo).
-- Generate a full-access GraphQL token. Put it in `.env` as `WAVE_API_TOKEN` and the business id as `WAVE_BUSINESS_ID`.
-- Verify connectivity and the overdue query:
+### 1. Invoice source + sandbox (Gate 0)
+Default source is **QuickBooks** (works globally). Wave is also supported but only for US/Canada businesses.
+
+QuickBooks:
+- Create a free Intuit developer account + sandbox company at https://developer.intuit.com. The sandbox comes preloaded with sample invoices (some overdue).
+- Mint an access token from the OAuth Playground (scope `com.intuit.quickbooks.accounting`). Put it in `.env` as `QBO_ACCESS_TOKEN` and your sandbox company id as `QBO_REALM_ID`. Keep `PAYUP_SOURCE=quickbooks`.
+
+Then preview the batch (renders against the bundled sandbox seed, sends nothing):
 
 ```bash
 cd "$CLAUDE_PLUGIN_ROOT" && PYTHONPATH=engine python3 -m payup.cli plan-chase --invoices fixtures-sandbox/demo_business.json --now "$(date +%F)" 2>&1 || true
 ```
 
-Confirm the batch renders. This is Gate 0: PayUp trusts Wave for status, so make sure paid invoices drop out.
+Confirm the batch renders. This is Gate 0: PayUp trusts the accounting tool for status, so make sure paid invoices drop out (Balance 0 in QuickBooks).
+
+> Prefer Wave (US/CA)? Set `PAYUP_SOURCE=wave`, `WAVE_API_TOKEN`, `WAVE_BUSINESS_ID` instead.
 
 ### 2. Gmail OAuth (one-shot)
 ```bash

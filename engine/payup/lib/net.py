@@ -1,9 +1,9 @@
-"""Minimal SSRF-guarded HTTPS JSON transport (stdlib only).
+"""Minimal SSRF-guarded HTTPS transport (stdlib only).
 
-The whole engine talks to the network through this one function so the safety
-properties live in a single place: HTTPS only, public hosts only, no redirects
-to private space. Unit tests never call this (the Wave/Gmail layers expose mock
-seams), so it stays dependency-free.
+The whole engine talks to the network through this one module so the safety
+properties live in a single place: HTTPS only, public hosts only. Unit tests
+never call this (the connector layers expose mock seams), so it stays
+dependency-free.
 """
 
 from __future__ import annotations
@@ -14,9 +14,9 @@ import socket
 import ssl
 import urllib.error
 import urllib.request
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
-__all__ = ["post_json", "NetError", "HTTPStatusError"]
+__all__ = ["post_json", "get_json", "post_form", "NetError", "HTTPStatusError"]
 
 
 class NetError(Exception):
@@ -53,17 +53,7 @@ def _host_is_public(host: str) -> bool:
     return True
 
 
-def post_json(
-    url: str,
-    headers: dict[str, str],
-    payload: dict,
-    *,
-    timeout: float = 30.0,
-) -> dict:
-    """POST a JSON body to an HTTPS URL and return the parsed JSON response.
-
-    Raises NetError for scheme/host violations and HTTPStatusError for non-2xx.
-    """
+def _guard(url: str) -> None:
     parsed = urlparse(url)
     if parsed.scheme != "https":
         raise NetError(f"refusing non-https url: {url!r}")
@@ -72,12 +62,8 @@ def post_json(
     if not _host_is_public(parsed.hostname):
         raise NetError(f"refusing request to non-public host: {parsed.hostname!r}")
 
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
-    req.add_header("Content-Type", "application/json")
-    for key, value in headers.items():
-        req.add_header(key, value)
 
+def _send(req: urllib.request.Request, timeout: float) -> dict:
     ctx = ssl.create_default_context()
     try:
         with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
@@ -92,3 +78,42 @@ def post_json(
         raise HTTPStatusError(exc.code, detail) from exc
     except urllib.error.URLError as exc:  # type: ignore[attr-defined]
         raise NetError(str(exc.reason)) from exc
+
+
+def post_json(url: str, headers: dict[str, str], payload: dict, *, timeout: float = 30.0) -> dict:
+    """POST a JSON body to an HTTPS URL and return the parsed JSON response."""
+    _guard(url)
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+    req.add_header("Content-Type", "application/json")
+    for key, value in headers.items():
+        req.add_header(key, value)
+    return _send(req, timeout)
+
+
+def get_json(
+    url: str,
+    headers: dict[str, str],
+    *,
+    params: dict[str, str] | None = None,
+    timeout: float = 30.0,
+) -> dict:
+    """GET an HTTPS URL (optionally with query params) and return parsed JSON."""
+    if params:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}{urlencode(params)}"
+    _guard(url)
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("Accept", "application/json")
+    for key, value in headers.items():
+        req.add_header(key, value)
+    return _send(req, timeout)
+
+
+def post_form(url: str, headers: dict[str, str], form: dict[str, str], *, timeout: float = 30.0) -> dict:
+    """POST a urlencoded form body (used for OAuth token refresh) and return JSON."""
+    _guard(url)
+    req = urllib.request.Request(url, data=urlencode(form).encode("utf-8"), method="POST")
+    req.add_header("Content-Type", "application/x-www-form-urlencoded")
+    for key, value in headers.items():
+        req.add_header(key, value)
+    return _send(req, timeout)
