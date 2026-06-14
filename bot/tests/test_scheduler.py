@@ -5,7 +5,7 @@ from datetime import date, datetime
 from payup.lib import wave
 
 from bot.handlers import BotDeps, ChaseSession
-from bot.scheduler import run_daily, seconds_until
+from bot.scheduler import loop, run_daily, seconds_until
 
 from .conftest import load_wave
 
@@ -41,3 +41,19 @@ def test_seconds_until_rolls_to_tomorrow():
     now = datetime(2026, 6, 4, 10, 0, 0)
     secs = seconds_until("09:00", now=now)
     assert 23 * 3600 <= secs <= 24 * 3600
+
+
+def test_loop_survives_run_error():
+    # Regression: a failing daily run must not kill the timer thread.
+    class StubSession:
+        def refresh(self, channel):
+            return "batch text"
+
+    calls = {"n": 0}
+
+    def boom(channel, text):
+        calls["n"] += 1
+        raise RuntimeError("slack down")
+
+    loop(StubSession(), "C1", boom, "09:00", _sleep=lambda s: None, _max_iters=3)
+    assert calls["n"] == 3  # kept going despite every run failing

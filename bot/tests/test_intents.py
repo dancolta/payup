@@ -64,3 +64,29 @@ def test_out_of_range_numbers_ignored():
 
 def test_empty_is_unknown():
     assert parse_intent("", BATCH).kind == "unknown"
+
+
+def test_negated_send_is_unknown():
+    # "do not send all" must NOT send everything.
+    assert parse_intent("do not send all", BATCH).kind == "unknown"
+    assert parse_intent("don't send anything", BATCH).kind == "unknown"
+    assert parse_intent("cancel, do not send 1", BATCH).kind == "unknown"
+
+
+def test_question_send_is_unknown():
+    # A question is not a command.
+    assert parse_intent("should I send all?", BATCH).kind == "unknown"
+    assert parse_intent("can you send 1 and 3?", BATCH).kind == "unknown"
+
+
+def test_stopword_in_name_not_matched():
+    # "and" in "send 1 and 3" must not select a customer named "Smith and Sons".
+    batch = BATCH + [{"n": 4, "customer": "Smith and Sons"}]
+    i = parse_intent("send 1 and 3", batch)
+    assert i.kind == "send" and i.ids == (1, 3)
+
+
+def test_strips_slack_mention():
+    # An @mention prefix (Slack markup) must not break a command.
+    i = parse_intent("<@U12345> send all", BATCH)
+    assert i.kind == "send" and i.all is True

@@ -36,10 +36,17 @@ def seconds_until(target_hhmm: str, *, now: datetime | None = None) -> float:
     return (target - now).total_seconds()
 
 
-def loop(session: ChaseSession, channel: str, post_fn, daily_at: str, *, _sleep=time.sleep, _max_iters=None):  # pragma: no cover
-    """Block forever, posting the batch once per day at `daily_at`."""
+def loop(session: ChaseSession, channel: str, post_fn, daily_at: str, *, _sleep=time.sleep, _max_iters=None):
+    """Block forever, posting the batch once per day at `daily_at`.
+
+    A failed run (e.g. a transient network or token error) is caught and logged
+    so the daily timer keeps running. Without this, the first error would kill
+    the thread silently and the bot would never auto-post again."""
     iters = 0
     while _max_iters is None or iters < _max_iters:
         _sleep(seconds_until(daily_at))
-        run_daily(session, channel, post_fn)
+        try:
+            run_daily(session, channel, post_fn)
+        except Exception as exc:  # noqa: BLE001 - resilience: never let one run kill the timer
+            print(f"PayUp daily run failed: {exc!r}. Will retry at the next {daily_at}.")
         iters += 1

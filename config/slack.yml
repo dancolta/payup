@@ -9,5 +9,5 @@ daily_at: "09:00"
 # Default action when a batch is posted and you say nothing: send NOTHING.
 default_action: "none"
 
-# Approve by reacting (emoji) as well as by replying.
-approve_emoji: "white_check_mark"
+# Approve by replying in the channel: "send all", "send 1 and 3", "skip Delta".
+# (Reaction/emoji approval is planned for v1.1 and is not wired yet.)

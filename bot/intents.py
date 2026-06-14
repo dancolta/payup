@@ -18,6 +18,29 @@ _SKIP_VERBS = ("skip", "ignore", "hold", "snooze")
 _SHOW_WORDS = ("show overdue", "show", "overdue", "list", "what's overdue", "whats overdue", "status")
 _HELP_WORDS = ("help", "commands", "?", "how do i")
 
+# Slack markup like <@U123>, <#C123|name>, <https://...> is stripped before
+# parsing, so an @mention prefix does not leak ids/digits into matching.
+_MARKUP_RE = re.compile(r"<[^>]+>")
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+# A "send" command that contains a negation or reads as a question is NOT a send.
+# Protects the HITL gate from "do not send all" / "should I send all?".
+_NEGATION_RE = re.compile(r"\b(?:not|never|cancel|cancelled|stop|without)\b|n't")
+_QUESTION_LEADS = (
+    "should", "shall", "can ", "could", "would", "do i", "does", "is it",
+    "is this", "are we", "are these", "what", "why", "when", "how", "may i", "ok to",
+)
+
+# Generic tokens that must never resolve a customer by name (e.g. "and" in
+# "send 1 and 3" must not select a customer called "Smith and Sons").
+_NAME_STOPWORDS = frozenset(
+    {
+        "and", "the", "for", "all", "send", "skip", "approve", "chase", "remind",
+        "ignore", "hold", "snooze", "invoice", "invoices", "please", "row", "rows",
+        "number", "numbers", "inc", "llc", "ltd", "corp", "company", "limited",
+    }
+)
+
 
 @dataclass(frozen=True)
 class Intent:
@@ -27,13 +50,18 @@ class Intent:
 
 
 def _resolve_names(text: str, batch: list[dict]) -> set[int]:
+    words = set(_WORD_RE.findall(text))
     found: set[int] = set()
     for row in batch:
         name = str(row.get("customer", "")).lower()
-        for token in name.split():
-            if len(token) >= 3 and token in text:
+        for token in _WORD_RE.findall(name):
+            if len(token) >= 3 and token not in _NAME_STOPWORDS and token in words:
                 found.add(int(row["n"]))
     return found
+
+
+def _is_question(t: str) -> bool:
+    return t.endswith("?") or any(t.startswith(w) for w in _QUESTION_LEADS)
 
 
 def _resolve_numbers(text: str, batch: list[dict]) -> set[int]:
@@ -45,7 +73,7 @@ def parse_intent(text: str, batch: list[dict] | None = None) -> Intent:
     """Parse a Slack message into an Intent. `batch` rows are dicts with at least
     {'n': int, 'customer': str} so names like "Delta" resolve to a row number."""
     batch = batch or []
-    t = (text or "").strip().lower()
+    t = _MARKUP_RE.sub(" ", (text or "")).strip().lower()
     if not t:
         return Intent("unknown")
 
@@ -65,6 +93,11 @@ def parse_intent(text: str, batch: list[dict] | None = None) -> Intent:
         return Intent("unknown")
 
     kind = "send" if has_send else "skip"
+
+    # HITL guard: a send that is negated or phrased as a question is not a send.
+    if kind == "send" and (_NEGATION_RE.search(t) or _is_question(t)):
+        return Intent("unknown")
+
     if re.search(r"\ball\b", t):
         return Intent(kind, all=True)
 

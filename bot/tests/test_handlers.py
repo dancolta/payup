@@ -75,3 +75,36 @@ def test_send_before_batch_is_safe(session):
 def test_help(session):
     out = session.handle(CH, "help")
     assert "PayUp commands" in out
+
+
+def test_send_all_twice_does_not_resend(session):
+    # Regression: after a real send the batch must clear so a repeated "send all"
+    # cannot double-send every reminder.
+    session.refresh(CH)
+    out1 = session.handle(CH, "send all")
+    assert "Sent 3" in out1
+    assert len(session._gmail.sent) == 3
+
+    out2 = session.handle(CH, "send all")
+    assert len(session._gmail.sent) == 3  # nothing sent twice
+    assert "No batch" in out2
+
+
+def test_skip_then_send_all_excludes_skipped(session):
+    # Regression: "skip" must actually remove the row, so a later "send all"
+    # does not send the invoice the user was told was skipped.
+    session.refresh(CH)
+    session.handle(CH, "skip Delta")  # row 3 = Delta (#0998)
+    out = session.handle(CH, "send all")
+    assert len(session._gmail.sent) == 2  # Delta dropped
+    assert "0998" not in out
+
+
+def test_duplicate_event_id_is_ignored(session):
+    # Regression: Slack delivers a channel @mention as both app_mention and
+    # message; the same event id must be handled once.
+    session.refresh(CH)
+    first = session.handle(CH, "help", event_id="evt-1")
+    assert first is not None and "PayUp commands" in first
+    dup = session.handle(CH, "help", event_id="evt-1")
+    assert dup is None

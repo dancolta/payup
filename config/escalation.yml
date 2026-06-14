@@ -1,5 +1,6 @@
-# Escalation policy. These are the shipped defaults (also baked into
-# EscalationConfig), exposed here so you can tune tone/timing without code.
+# Escalation policy. Loaded by the bot at startup (when pyyaml is installed via
+# the [bot] extra); the matching PAYUP_* env vars override any value here.
+# These are the shipped defaults (also baked into EscalationConfig).
 
 # Never chase the same invoice twice inside this many days.
 min_gap_days: 7

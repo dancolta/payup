@@ -26,24 +26,32 @@ def build_plan(
     source_name: str | None = None,
     gmail_creds=None,
     gmail_transport=None,
-    lookback_days: int = 7,
+    history_days: int = 90,
+    source_kwargs: dict | None = None,
     cfg: PayupConfig | None = None,
 ) -> list[Action | Skip]:
     """Fetch overdue-unpaid invoices and join with Gmail send-history into a plan.
 
     `source_name` selects the invoice connector (default QuickBooks; "wave" also
     available). `token`/`business_id` are that source's credentials.
+    `source_kwargs` are extra keyword args for the connector (e.g. QBO `host`).
+
+    `history_days` is how far back the Gmail dedupe search looks. It is wider
+    than the escalation min_gap on purpose: min_gap (in cfg.escalation) gates how
+    *recently* we chased, while history_days is how many prior reminders we count
+    for tier escalation. Tying them together (the old default) made the prior
+    count effectively always zero whenever a send was allowed.
     """
     cfg = cfg or PayupConfig()
     source_fn = get_source(source_name)
-    invoices = source_fn(token, business_id, now=now)
+    invoices = source_fn(token, business_id, now=now, **(source_kwargs or {}))
     prior_by_invoice: dict[str, list[date]] = {}
     for inv in invoices:
         refs = gmail.prior_reminders(
             inv.invoice_number,
             inv.customer_email,
             gmail_creds,
-            lookback_days=lookback_days,
+            lookback_days=history_days,
             transport=gmail_transport,
         )
         prior_by_invoice[inv.invoice_number] = [r.sent_date for r in refs]

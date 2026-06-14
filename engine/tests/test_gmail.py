@@ -38,6 +38,22 @@ def test_dry_run_sends_nothing():
     assert tp.sent == []
 
 
+def test_send_rejects_non_true_truthy():
+    # The gate requires approved is exactly True, not just any truthy value.
+    tp = FakeGmail()
+    with pytest.raises(NotApprovedError):
+        send_message(DRAFT, approved=1, dry_run=False, transport=tp)
+    assert tp.sent == []
+
+
+def test_build_search_query_sanitizes_injection():
+    # Quotes/operators in an odd invoice number must not break out of the query.
+    q = build_search_query('1042") OR subject:("x', "ap@acme.example", 7)
+    assert '") OR' not in q
+    assert "1042" in q
+    assert "newer_than:7d" in q
+
+
 def test_approved_send_builds_payload():
     tp = FakeGmail()
     result = send_message(DRAFT, approved=True, dry_run=False, transport=tp)

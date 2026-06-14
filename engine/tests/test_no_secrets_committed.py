@@ -15,19 +15,47 @@ SECRET_PATTERNS = [
     re.compile(r"xapp-[A-Za-z0-9-]{10,}"),          # Slack app token
     re.compile(r"sk-ant-[A-Za-z0-9-]{10,}"),        # Anthropic key
     re.compile(r"AIza[0-9A-Za-z_\-]{30,}"),         # Google API key
+    re.compile(r"GOCSPX-[A-Za-z0-9_\-]{20,}"),      # Google OAuth client secret
+    re.compile(r"\b1//[A-Za-z0-9_\-]{30,}"),        # Google OAuth refresh token
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
 ]
 # Placeholders that are allowed to appear in examples/docs.
 ALLOW = ("xoxb-...", "xapp-...", "sk-ant-...")
 
-FORBIDDEN_TRACKED = ("config/token.json", "config/oauth.json", ".env")
+# Credential / state files that must never be tracked. config/oauth_client.json
+# is the Google OAuth client secret this project actually downloads.
+FORBIDDEN_TRACKED = (
+    "config/token.json",
+    "config/oauth.json",
+    "config/oauth_client.json",
+    ".env",
+)
 
 
 def _tracked_files():
     out = subprocess.run(
         ["git", "ls-files"], cwd=REPO, capture_output=True, text=True
     )
-    return [f for f in out.stdout.splitlines() if f.strip()]
+    # Fail loudly rather than passing vacuously: an empty list from a broken git
+    # invocation would make every scan below trivially "clean".
+    assert out.returncode == 0, f"git ls-files failed: {out.stderr.strip()}"
+    files = [f for f in out.stdout.splitlines() if f.strip()]
+    assert files, "git ls-files returned no tracked files (not a repo?)"
+    return files
+
+
+def test_secret_patterns_match_known_credential_shapes():
+    # Guards the guard: the patterns must actually fire on real secret shapes.
+    # Built by concatenation so these samples are not themselves scannable
+    # literals in this tracked file.
+    samples = [
+        "xoxb-" + "1234567890-abcdEFGH",
+        "xapp-" + "1-A012-secrettokenvalue",
+        "GOCSPX-" + "abcdEFGH1234567890wxyz",
+        "1//" + "0gAbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
+    ]
+    for s in samples:
+        assert any(p.search(s) for p in SECRET_PATTERNS), f"no pattern matched {s!r}"
 
 
 def test_no_secret_patterns_in_tracked_files():

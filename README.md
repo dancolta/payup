@@ -18,7 +18,7 @@ Gmail sent-history (dedupe)   ─┘                                       (reso
 
 - **QuickBooks** says who is overdue and still unpaid (Balance > 0, past due). A paid invoice drops out of the query, so chasing resolves itself. This is authoritative, not a guess from a reply that says "paid". Swappable: `PAYUP_SOURCE=wave` uses Wave instead.
 - **Gmail sent-history** is the memory: a search keyed on the invoice number gives the prior-reminder count (for escalation) and the last-sent date (so we never re-nag inside `min_gap_days`).
-- **Templates** produce the draft with no API key and no cost. An optional Claude polish is available if you set `ANTHROPIC_API_KEY`.
+- **Templates** produce the draft with no API key and no cost. (A Claude-polished wording step is planned for v1.1; today the deterministic templates are used as-is.)
 
 ## What runs automatically (and what does not)
 
@@ -54,9 +54,11 @@ Copy `.env.example` to `.env` and fill in:
 | `QBO_ACCESS_TOKEN`, `QBO_REALM_ID` | https://developer.intuit.com (free sandbox company + OAuth Playground token) |
 | Gmail OAuth (`config/token.json`) | run `python engine/scripts/gmail_oauth_setup.py` once |
 | `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` | https://api.slack.com/apps (enable Socket Mode) |
-| `ANTHROPIC_API_KEY` *(optional)* | only if you want LLM-polished wording |
+| `QBO_REFRESH_TOKEN` + `QBO_CLIENT_ID` + `QBO_CLIENT_SECRET` *(for always-on)* | so the bot renews the hourly QBO access token itself |
 
 > Using Wave instead (US/Canada only)? Set `PAYUP_SOURCE=wave` and provide `WAVE_API_TOKEN` + `WAVE_BUSINESS_ID`.
+>
+> `ANTHROPIC_API_KEY` is reserved for a planned v1.1 draft-polish step and has no effect yet.
 
 ### 3. Preview without sending
 ```bash
@@ -78,12 +80,15 @@ The bot needs to stay running so its daily timer ticks even when your laptop is 
 **Fly.io (recommended):**
 ```bash
 fly launch --no-deploy            # rename the app in fly.toml
-fly secrets set WAVE_API_TOKEN=... WAVE_BUSINESS_ID=... \
+fly secrets set QBO_ACCESS_TOKEN=... QBO_REALM_ID=... \
+                QBO_REFRESH_TOKEN=... QBO_CLIENT_ID=... QBO_CLIENT_SECRET=... \
                 SLACK_BOT_TOKEN=xoxb-... SLACK_APP_TOKEN=xapp-... \
                 PAYUP_LIVE=1
 fly deploy
 ```
 Railway, Render, a small VPS, or any machine that stays on will work the same way (`docker build` + run with the env vars).
+
+> QuickBooks access tokens expire hourly. For an always-on bot, set `QBO_REFRESH_TOKEN` + `QBO_CLIENT_ID` + `QBO_CLIENT_SECRET` so PayUp renews the token before each daily run; otherwise it works only until the first token expires. Set `PAYUP_QBO_ENV=production` to point at your real company (the default is the Intuit sandbox).
 
 ## Slack commands
 

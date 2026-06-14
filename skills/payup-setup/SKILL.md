@@ -20,6 +20,7 @@ Default source is **QuickBooks** (works globally). Wave is also supported but on
 QuickBooks:
 - Create a free Intuit developer account + sandbox company at https://developer.intuit.com. The sandbox comes preloaded with sample invoices (some overdue).
 - Mint an access token from the OAuth Playground (scope `com.intuit.quickbooks.accounting`). Put it in `.env` as `QBO_ACCESS_TOKEN` and your sandbox company id as `QBO_REALM_ID`. Keep `PAYUP_SOURCE=quickbooks`.
+- QuickBooks access tokens expire hourly. For a one-off check a fresh token is fine. For the always-on bot, also set `QBO_REFRESH_TOKEN`, `QBO_CLIENT_ID`, and `QBO_CLIENT_SECRET` (all three) so PayUp renews the token itself before each daily run.
 
 Then preview the batch (renders against the bundled sandbox seed, sends nothing):
 
@@ -49,7 +50,7 @@ Local test:
 ```bash
 cd "$CLAUDE_PLUGIN_ROOT" && pip install -e '.[bot]' && PAYUP_LIVE=0 python3 -m bot.app
 ```
-`PAYUP_LIVE=0` keeps it in dry-run (drafts but never sends) until you are ready. For always-on hosting, see the deploy guide in `README.md` (Fly.io recommended).
+`PAYUP_LIVE=0` keeps it in dry-run (drafts but never sends) until you are ready. Keep `PAYUP_QBO_ENV=sandbox` while testing; set it to `production` only when you are ready to chase your real QuickBooks company. For always-on hosting, see the deploy guide in `README.md` (Fly.io recommended).
 
 ## Safety reminders to surface
 - Nothing sends without explicit approval, in both Claude and Slack.

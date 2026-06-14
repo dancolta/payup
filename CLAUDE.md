@@ -35,7 +35,8 @@ engine/payup/
   lib/runner.py       build_plan (fetch + join) and execute (send approved only).
   lib/reply.py        pure reply classifier. Context only, never resolves.
   lib/ledger.py       optional local JSONL (status view only, not authoritative).
-  lib/net.py          SSRF-guarded HTTPS transport. The single network choke point.
+  lib/net.py          SSRF-guarded HTTPS transport (no redirects). Choke point for
+                      all non-Gmail HTTP (QuickBooks, Wave, OAuth refresh).
   cli.py              plan-chase | send | status. Shared by skills + humans.
 skills/, commands/, hooks/   Claude Code plugin surface (setup + dry-run).
 ```
@@ -57,6 +58,6 @@ PYTHONPATH=engine python3 -m payup.cli plan-chase \
 ## Conventions
 
 - Python 3.10+, stdlib-only core engine. Bot/runtime deps live behind the `[bot]` extra and are imported lazily, so the engine and tests never require them.
-- Every network call goes through `net.py`. Tests never hit the network: QuickBooks mocks `_query`, Wave mocks `_post_graphql`, Gmail injects a fake transport.
+- External HTTP to the accounting APIs and OAuth goes through `net.py` (HTTPS-only, public-host-only, no redirects). The one exception is Gmail, which uses Google's official API client and manages its own transport; that path is still gated by the approval check in `gmail.send_message`. Tests never hit the network: QuickBooks mocks `_query`, Wave mocks `_post_graphql`, Gmail injects a fake transport.
 - Pure functions (escalation, templating, planner, intents, reply) take their inputs explicitly and are unit-tested on synthetic data with a fixed `NOW`.
 - New behaviour ships with tests, and the guardrail suite must stay green.

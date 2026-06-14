@@ -21,6 +21,7 @@ bot = [
   "slack-bolt>=1.18",
   "google-api-python-client>=2.100",
   "google-auth-oauthlib>=1.2",
+  "pyyaml>=6.0",
 ]
 # Optional LLM polish of draft emails.
 polish = [
@@ -30,6 +31,7 @@ dev = [
   "pytest>=8.0",
   "pytest-cov>=5.0",
   "ruff>=0.6",
+  "pyyaml>=6.0",
 ]
 
 [project.scripts]

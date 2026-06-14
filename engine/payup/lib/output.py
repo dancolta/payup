@@ -23,7 +23,7 @@ def render_batch(plan: list[Action | Skip], *, now=None) -> str:
             msg += f" ({len(skips)} overdue but skipped: within the no-nag window.)"
         return msg
 
-    lines = [f"PayUp found {len(actions)} invoice(s) ready to chase. React or reply to approve.", ""]
+    lines = [f"PayUp found {len(actions)} invoice(s) ready to chase. Reply to approve.", ""]
     for i, act in enumerate(actions, start=1):
         inv = act.invoice
         amount = _format_amount(inv.amount_due_cents, inv.currency)

@@ -1,9 +1,12 @@
 """Minimal SSRF-guarded HTTPS transport (stdlib only).
 
-The whole engine talks to the network through this one module so the safety
-properties live in a single place: HTTPS only, public hosts only. Unit tests
-never call this (the connector layers expose mock seams), so it stays
-dependency-free.
+Every outbound call to the accounting APIs (QuickBooks, Wave) and OAuth token
+endpoints goes through this one module, so the safety properties live in a
+single place: HTTPS only, public hosts only, and no following redirects (a 3xx
+to a private host cannot defeat the guard). The one HTTP path that does not use
+this module is Gmail, which uses Google's official API client; that path is
+still protected by the approval gate in gmail.send_message. Unit tests never
+call this (the connector layers expose mock seams), so it stays dependency-free.
 """
 
 from __future__ import annotations
@@ -63,10 +66,20 @@ def _guard(url: str) -> None:
         raise NetError(f"refusing request to non-public host: {parsed.hostname!r}")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Block all redirects. A 3xx response is surfaced as an HTTPError instead
+    of being followed, so a redirect to a private/loopback host (or to http)
+    cannot slip past the _guard check, which only validates the original URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def _send(req: urllib.request.Request, timeout: float) -> dict:
     ctx = ssl.create_default_context()
+    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx), _NoRedirect)
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+        with opener.open(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body) if body else {}
     except urllib.error.HTTPError as exc:  # type: ignore[attr-defined]

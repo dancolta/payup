@@ -130,6 +130,14 @@ def list_overdue_unpaid(token: str, business_id: str, *, now: date) -> list[Invo
             _OVERDUE_QUERY,
             {"businessId": business_id, "page": page, "pageSize": _PAGE_SIZE},
         )
+        # Fail closed: an unknown or inaccessible business id comes back as a
+        # null `business` (not an error). Treat that as a misconfiguration, not
+        # as "nothing overdue", so a wrong WAVE_BUSINESS_ID never reads as all-paid.
+        if "business" in data and data["business"] is None:
+            raise WaveAPIError(
+                f"Wave returned no business for id {business_id!r} "
+                "(not found, or the token lacks access)"
+            )
         business = data.get("business") or {}
         invoices = business.get("invoices") or {}
         edges = invoices.get("edges") or []

@@ -13,6 +13,7 @@ no network is touched and the approval gate is asserted by call count.
 from __future__ import annotations
 
 import base64
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -75,11 +76,20 @@ class Transport(Protocol):
     def list_thread(self, thread_id: str) -> list[dict]: ...
 
 
+def _sanitize_term(value: str) -> str:
+    """Strip characters that would break out of a quoted Gmail search term
+    (quotes, parens, backslashes) so an odd invoice number or email cannot
+    inject search operators and silently corrupt the dedupe count."""
+    return re.sub(r'["()\\]', "", str(value)).strip()
+
+
 def build_search_query(invoice_number: str, customer_email: str, lookback_days: int) -> str:
     """The Sent-mail dedupe query. Invoice number is the join key (it is always
     in the subject, enforced by the templating test)."""
+    inv = _sanitize_term(invoice_number)
+    email = _sanitize_term(customer_email)
     return (
-        f'to:{customer_email} subject:("Invoice #{invoice_number}") '
+        f'to:{email} subject:("Invoice #{inv}") '
         f"in:sent newer_than:{lookback_days}d"
     )
 
@@ -88,7 +98,9 @@ def _raw_b64(draft: Draft) -> str:
     msg = EmailMessage()
     msg["To"] = draft.to
     msg["Subject"] = draft.subject
-    # Machine-readable join key, in addition to the subject, for precise dedupe.
+    # Stable machine-readable marker for manual tracing. The active dedupe is the
+    # subject search in build_search_query: Gmail's `q` cannot reliably match
+    # arbitrary custom headers, so this header is a convenience, not the key.
     msg["X-PayUp-Invoice-Id"] = draft.invoice_number
     msg.set_content(draft.body)
     return base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
@@ -102,8 +114,9 @@ def send_message(
     creds=None,
     transport: Transport | None = None,
 ) -> SendResult:
-    """Send a reminder. HARD GATE: raises before any network call if not approved."""
-    if not approved:
+    """Send a reminder. HARD GATE: raises before any network call unless approved
+    is exactly True (a truthy-but-not-True value is treated as not approved)."""
+    if approved is not True:
         raise NotApprovedError(
             f"refusing to send reminder for invoice #{draft.invoice_number}: not approved"
         )

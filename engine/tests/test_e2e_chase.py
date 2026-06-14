@@ -80,6 +80,17 @@ def test_resolve_on_paid(monkeypatch):
     assert "1001" not in numbers  # paid -> no chase, resolved implicitly
 
 
+def test_build_plan_uses_wide_history_window(monkeypatch):
+    # Regression: the Gmail dedupe/escalation window must be wider than min_gap,
+    # else prior-count escalation can never fire. Default is 90 days.
+    _wire_wave(monkeypatch)
+    fake = FakeGmail(search_results=[])
+    runner.build_plan(
+        now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake
+    )
+    assert "newer_than:90d" in fake.last_query
+
+
 def test_second_run_after_send_does_not_resend(monkeypatch):
     """Simulate: run 1 sends #0998; run 2 sees that prior in Gmail and skips it."""
     _wire_wave(monkeypatch)

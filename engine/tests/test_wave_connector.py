@@ -80,3 +80,10 @@ def test_generic_http_error_is_wave_error(monkeypatch):
     monkeypatch.setattr(net, "post_json", boom)
     with pytest.raises(WaveError):
         list_overdue_unpaid("tok", "SANDBOX-DEMO-0001", now=NOW)
+
+
+def test_unknown_business_fails_closed(monkeypatch):
+    # A null business (unknown id / no access) must error, not look like "all paid".
+    monkeypatch.setattr(wave, "_post_graphql", lambda token, query, variables: {"business": None})
+    with pytest.raises(WaveError):
+        list_overdue_unpaid("tok", "BAD-BUSINESS-ID", now=NOW)
