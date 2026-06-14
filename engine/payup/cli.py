@@ -15,8 +15,8 @@ import sys
 from datetime import date
 
 from .lib import ledger, output
+from .lib.models import Invoice
 from .lib.planner import PayupConfig, plan_chase
-from .lib.wave import Invoice
 
 
 def _load_invoices_from_json(path: str, *, now: date) -> list[Invoice]:
@@ -96,7 +96,10 @@ def _cmd_send(args) -> int:
 
 
 def _cmd_status(args) -> int:
-    records = ledger.recent(args.limit)
+    # Resolve the ledger path at call time so PAYUP_LEDGER is honored even when
+    # set after import (and so the bot and CLI agree on where runs are recorded).
+    path = os.environ.get("PAYUP_LEDGER", ledger.DEFAULT_PATH)
+    records = ledger.recent(args.limit, path)
     if not records:
         print("No runs recorded yet.")
         return 0

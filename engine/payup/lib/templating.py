@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .escalation import Tier
-from .wave import Invoice
+from .models import Invoice
 
 __all__ = ["Draft", "render_email", "BLACKLIST", "TemplatingConfig"]
 

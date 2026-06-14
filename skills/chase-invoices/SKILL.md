@@ -22,4 +22,4 @@ To actually send, operate from Slack (the bot holds the approved Gmail transport
 cd "$CLAUDE_PLUGIN_ROOT" && PYTHONPATH=engine python3 -m payup.cli send   # prints a refusal, sends nothing
 ```
 
-Reminders escalate by how overdue an invoice is and how many times it was already chased. A reminder is never sent twice inside `min_gap_days`, and an invoice paid in Wave drops out of the batch automatically.
+Reminders escalate by how overdue an invoice is and how many times it was already chased. A reminder is never sent twice inside `min_gap_days`, and an invoice marked paid in your accounting tool (QuickBooks or Wave) drops out of the batch automatically.

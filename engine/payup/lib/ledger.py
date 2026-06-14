@@ -1,8 +1,9 @@
 """Optional local run ledger (append-only JSONL).
 
-NOT authoritative. Wave + Gmail are the source of truth; this only powers a fast
-`status` view and a human-readable audit of what the bot did. It lives on the
-bot host and is gitignored (it can contain customer-identifying data).
+NOT authoritative. The accounting source (QuickBooks/Wave) + Gmail are the source
+of truth; this only powers a fast `status` view and a human-readable audit of what
+the bot did. It is appended by the bot after a real send (see bot/handlers.py).
+It lives on the bot host and is gitignored (it can contain customer-identifying data).
 """
 
 from __future__ import annotations

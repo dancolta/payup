@@ -6,7 +6,7 @@ allowed-tools: Bash, Read
 
 # /chase-status (recent runs)
 
-Read the local JSONL ledger and show recent runs. The ledger is a convenience log only; Wave and Gmail remain the source of truth.
+Read the local JSONL ledger and show recent runs. The ledger is a convenience log only; your accounting tool (QuickBooks or Wave) and Gmail remain the source of truth.
 
 ```bash
 cd "$CLAUDE_PLUGIN_ROOT" && PYTHONPATH=engine python3 -m payup.cli status --limit 20

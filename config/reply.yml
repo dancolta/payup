@@ -1,8 +1,8 @@
 # Reply handling policy.
 #
 # IMPORTANT: replies are context only. Whether to STOP chasing is decided solely
-# by Wave invoice status (paid = drops out of the overdue query). A reply that
-# claims payment never silences a chase on its own.
+# by the accounting tool's invoice status (paid = drops out of the overdue
+# query). A reply that claims payment never silences a chase on its own.
 
 # Confidence floor below which a label is shown as "unclear" in Slack.
 min_display_confidence: 0.5

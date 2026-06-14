@@ -19,7 +19,20 @@ def test_plan_chase_renders_sandbox_batch(capsys):
 
 def test_status_empty(capsys, tmp_path, monkeypatch):
     monkeypatch.setenv("PAYUP_LEDGER", str(tmp_path / "none.jsonl"))
-    # reload ledger default? cli.status reads ledger.recent with default path arg;
-    # call status and accept either empty message or no rows.
     rc = cli.main(["status", "--limit", "5"])
+    out = capsys.readouterr().out
     assert rc == 0
+    assert "No runs recorded yet" in out
+
+
+def test_status_shows_recorded_run(capsys, tmp_path, monkeypatch):
+    # cli status must read PAYUP_LEDGER at call time and show recorded runs.
+    from payup.lib import ledger
+
+    p = tmp_path / "runs.jsonl"
+    ledger.append_run({"date": "2026-06-04", "sent": ["1001"], "skipped": []}, str(p))
+    monkeypatch.setenv("PAYUP_LEDGER", str(p))
+    rc = cli.main(["status", "--limit", "5"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "1001" in out

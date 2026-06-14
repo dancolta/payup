@@ -13,7 +13,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import date
 
-from payup.lib import output, runner
+from payup.lib import ledger, output, runner
 from payup.lib.planner import Action, PayupConfig
 
 from .intents import parse_intent
@@ -55,6 +55,9 @@ class BotDeps:
     client_secret: str | None = None
     # Extra keyword args forwarded to the source connector (e.g. QBO `host`).
     source_kwargs: dict = field(default_factory=dict)
+    # Where to append the run ledger that powers /chase-status. None disables
+    # writing (the default, so tests never touch the filesystem); the bot sets it.
+    ledger_path: str | None = None
     now_fn: object = date.today
 
     def now(self) -> date:
@@ -193,6 +196,17 @@ class ChaseSession:
                 for it in plan
                 if not (isinstance(it, Action) and it.invoice.invoice_id in approved)
             ]
+            # Record the run so /chase-status reflects real activity.
+            if self.deps.ledger_path:
+                ledger.append_run(
+                    {
+                        "date": self.deps.now().isoformat(),
+                        "source": self.deps.source_name,
+                        "sent": sent,
+                        "skipped": skipped,
+                    },
+                    self.deps.ledger_path,
+                )
         prefix = "[dry-run] " if self.deps.dry_run else ""
         return prefix + output.render_confirmation(
             [f"#{s}" for s in sent], [f"#{s}" for s in skipped]

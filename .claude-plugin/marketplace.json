@@ -11,7 +11,7 @@
     {
       "name": "payup",
       "source": "./",
-      "description": "Chase overdue invoices conversationally from Slack. Wave + Gmail, HITL, never moves money.",
+      "description": "Chase overdue invoices conversationally from Slack. QuickBooks (or Wave) + Gmail, HITL, never moves money.",
       "version": "0.1.0",
       "author": {
         "name": "Dan Colta"

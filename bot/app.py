@@ -103,6 +103,7 @@ def _build_deps() -> BotDeps:  # pragma: no cover
         client_id=client_id,
         client_secret=client_secret,
         source_kwargs=source_kwargs,
+        ledger_path=os.environ.get("PAYUP_LEDGER", "ledger/runs.jsonl"),
         now_fn=date.today,
     )
 

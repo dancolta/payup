@@ -1,5 +1,6 @@
-"""The chase planner. Pure. Joins Wave (who's overdue) with Gmail (who we already
-chased) and decides, per invoice, whether to send a tiered draft or skip.
+"""The chase planner. Pure. Joins the accounting source (who's overdue) with
+Gmail (who we already chased) and decides, per invoice, whether to send a tiered
+draft or skip.
 
 No side effects, no network, no sends. The bot/CLI takes the resulting plan to a
 human for approval.
@@ -11,8 +12,8 @@ from dataclasses import dataclass
 from datetime import date
 
 from .escalation import EscalationConfig, Tier, select_tier
+from .models import Invoice
 from .templating import Draft, TemplatingConfig, render_email
-from .wave import Invoice
 
 __all__ = ["Action", "Skip", "PayupConfig", "plan_chase"]
 
