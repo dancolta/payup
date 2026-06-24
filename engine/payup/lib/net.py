@@ -75,8 +75,24 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def _send(req: urllib.request.Request, timeout: float) -> dict:
+def _ssl_context() -> ssl.SSLContext:
+    """A verifying TLS context. If the system trust store is empty (common with
+    some macOS / Homebrew Python builds, where cafile resolves to None), fall
+    back to certifi's CA bundle so real HTTPS still verifies. We never disable
+    verification; we only supply trusted roots when the OS did not."""
     ctx = ssl.create_default_context()
+    try:
+        if not ctx.get_ca_certs():
+            import certifi
+
+            ctx.load_verify_locations(certifi.where())
+    except Exception:
+        pass
+    return ctx
+
+
+def _send(req: urllib.request.Request, timeout: float) -> dict:
+    ctx = _ssl_context()
     opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx), _NoRedirect)
     try:
         with opener.open(req, timeout=timeout) as resp:
