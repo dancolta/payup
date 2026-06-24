@@ -61,6 +61,10 @@ A change is not done until: `pytest` is green, `ruff check engine bot` is clean,
 `claude plugin validate .` passes, and the guardrail suite holds (no money movement, no send
 without approval, sandbox isolation, no secrets / em dashes / PII). New behavior ships with tests.
 
+## Operating this repo for the maintainer
+
+When doing setup, verification, or demo prep for the maintainer, run shell commands yourself rather than printing command lists for them to copy-paste. The maintainer handles only browser-only steps (OAuth consent, sign-in, third-party dashboards). Everything runnable from a shell (deps, file moves, scripts, tests, git) is the agent's job.
+
 ## Layout
 
 ```

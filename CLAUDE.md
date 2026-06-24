@@ -61,3 +61,7 @@ PYTHONPATH=engine python3 -m payup.cli plan-chase \
 - External HTTP to the accounting APIs and OAuth goes through `net.py` (HTTPS-only, public-host-only, no redirects). The one exception is Gmail, which uses Google's official API client and manages its own transport; that path is still gated by the approval check in `gmail.send_message`. Tests never hit the network: QuickBooks mocks `_query`, Wave mocks `_post_graphql`, Gmail injects a fake transport.
 - Pure functions (escalation, templating, planner, intents, reply) take their inputs explicitly and are unit-tested on synthetic data with a fixed `NOW`.
 - New behaviour ships with tests, and the guardrail suite must stay green.
+
+## Operating this repo for the maintainer
+
+When doing setup, verification, or demo prep for the maintainer, run shell commands yourself with your execution tool. Do not hand the maintainer lists of terminal commands to copy-paste. The maintainer drives only the browser-only steps (OAuth consent screens, account sign-in, third-party dashboards). Anything runnable from a shell (installing deps, moving files, running scripts and tests, git) is the agent's job.
