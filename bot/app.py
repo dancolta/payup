@@ -108,7 +108,22 @@ def _build_deps() -> BotDeps:  # pragma: no cover
     )
 
 
+def _ensure_tls_ca() -> None:  # pragma: no cover - runtime only
+    """Point HTTPS clients at certifi when the system CA store is bare.
+
+    Some Python builds (e.g. macOS python.org / Homebrew) ship with no OpenSSL
+    CA bundle, which breaks HTTPS verification for the Slack and Google SDKs
+    (they use their own HTTP clients, not net.py). Verification stays on."""
+    try:
+        import certifi
+
+        os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    except Exception:
+        pass
+
+
 def main() -> None:  # pragma: no cover - runtime only
+    _ensure_tls_ca()
     from slack_bolt import App
     from slack_bolt.adapter.socket_mode import SocketModeHandler
 
