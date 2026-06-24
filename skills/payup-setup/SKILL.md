@@ -36,10 +36,15 @@ Confirm the batch renders. This is Gate 0: PayUp trusts the accounting tool for 
 ```bash
 cd "$CLAUDE_PLUGIN_ROOT" && python3 engine/scripts/gmail_oauth_setup.py
 ```
-This opens a consent screen once and writes `config/token.json` (gitignored). PayUp only ever sends after you approve in Slack.
+This opens a consent screen once and writes `config/token.json` (gitignored). It asks for three scopes: send, read, and compose. Compose powers the Slack `draft` command (save a reminder as a Gmail draft to review before sending). PayUp only ever sends after you approve in Slack.
+
+> Upgrading an older install? If `config/token.json` already exists from before draft support, delete it and run the script again to re-consent to the new `gmail.compose` scope. Otherwise `draft` will fail with an insufficient-scope error.
 
 ### 3. Escalation tiers (optional)
 Edit `config/escalation.yml` to taste (gentle/firm/final day bands, `min_gap_days`). Defaults are sensible.
+
+### 3b. Reminder wording (optional)
+Edit `config/templates.yml` to change the email copy: a `subject` and `body` per tier (gentle/firm/final). Placeholders you can use: `{customer_name}`, `{invoice_number}`, `{amount}`, `{due_date}`, `{sender_name}`, `{business_name}`. Anything you omit keeps the built-in default. Two rules are enforced on every rendered draft, custom copy included: the subject must contain `{invoice_number}` (the dedupe key) and there can be no legal/collections language or em dashes. Break either and PayUp refuses to render that draft.
 
 ### 4. Slack app (Socket Mode)
 - Create an app at https://api.slack.com/apps, enable Socket Mode, add bot scopes `chat:write`, `app_mentions:read`, `channels:history`.

@@ -5,7 +5,13 @@ from datetime import date
 import pytest
 from payup.lib import gmail
 from payup.lib.escalation import Tier
-from payup.lib.gmail import NotApprovedError, build_search_query, prior_reminders, send_message
+from payup.lib.gmail import (
+    NotApprovedError,
+    build_search_query,
+    create_gmail_draft,
+    prior_reminders,
+    send_message,
+)
 from payup.lib.templating import render_email
 from payup.lib.wave import Invoice
 
@@ -66,6 +72,40 @@ def test_approved_send_builds_payload():
     assert "1042" in raw
     assert "ap@acme.example" in raw
     assert "X-PayUp-Invoice-Id: 1042" in raw
+
+
+def test_dry_run_draft_touches_nothing():
+    tp = FakeGmail()
+    result = create_gmail_draft(DRAFT, dry_run=True, transport=tp)
+    assert result.dry_run is True
+    assert tp.drafted == []  # no transport call at all
+    assert tp.sent == []
+
+
+def test_live_draft_calls_transport_once_with_payload():
+    tp = FakeGmail()
+    result = create_gmail_draft(DRAFT, dry_run=False, transport=tp)
+    assert result.dry_run is False
+    assert result.draft_id == "draft_1"
+    assert len(tp.drafted) == 1
+    assert tp.sent == []  # a draft is never a send
+    import base64
+
+    raw = base64.urlsafe_b64decode(tp.drafted[0]).decode("utf-8")
+    assert "1042" in raw  # subject carries the invoice number
+    assert "ap@acme.example" in raw
+    assert "X-PayUp-Invoice-Id: 1042" in raw
+
+
+def test_draft_needs_no_approval_but_send_still_gated():
+    # Drafting has no approval gate (a draft cannot reach a client on its own),
+    # but the send gate stays unique to send_message.
+    tp = FakeGmail()
+    create_gmail_draft(DRAFT, dry_run=False, transport=tp)  # no approved kwarg, fine
+    assert len(tp.drafted) == 1
+    with pytest.raises(NotApprovedError):
+        send_message(DRAFT, approved=False, dry_run=False, transport=tp)
+    assert tp.sent == []
 
 
 def test_build_search_query_shape():

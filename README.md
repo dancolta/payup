@@ -97,10 +97,35 @@ Railway, Render, a small VPS, or any machine that stays on will work the same wa
 | `show overdue` | rebuild and post the current batch |
 | `send all` | send every reminder in the batch |
 | `send 1 and 3` | send specific rows |
+| `draft all` | save every reminder as a Gmail draft (sends nothing) |
+| `draft 1 and 3` | save specific rows as Gmail drafts |
 | `skip Delta` | drop a row (sends nothing) |
 | `help` | list commands |
 
 Anything ambiguous is treated as "do nothing" and PayUp asks you to clarify. It never sends on a guess.
+
+### Draft vs send
+
+`draft` saves the reminder into your Gmail Drafts folder instead of sending it. Use it when you want to tweak the wording, add a line, or eyeball the message in Gmail before it goes out. Open Gmail, review or edit the draft, and hit send yourself.
+
+A draft is **not** a chase. PayUp only counts an invoice as chased once a reminder actually lands in your Sent mail (the dedupe key is the invoice number in the subject of a sent message). So a drafted invoice still shows up in the next batch until you send it. `draft` gets the same guards as `send`: a question or a negation ("should I draft these?", "do not draft all") is treated as "do nothing".
+
+### Customizing templates
+
+The reminder wording lives in [config/templates.yml](config/templates.yml), one `subject` plus `body` block per tier (gentle, firm, final). Edit it to match your voice; anything you leave out keeps the built-in default. Available placeholders:
+
+```
+{customer_name}  {invoice_number}  {amount}  {due_date}  {sender_name}  {business_name}
+```
+
+Two rules are enforced at render time on every draft, including your custom copy:
+
+- the **subject must contain `{invoice_number}`** (it is the Gmail dedupe key), and
+- no legal / collections / threat language and **no em dashes**.
+
+Break either and PayUp refuses to render that draft rather than send something off-key. Point at a different file with `PAYUP_TEMPLATES_CONFIG`.
+
+> Draft support added the `gmail.compose` scope. If you set PayUp up before drafts existed, delete `config/token.json` and re-run `python engine/scripts/gmail_oauth_setup.py` to re-consent.
 
 ## Development
 

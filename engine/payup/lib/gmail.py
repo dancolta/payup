@@ -1,7 +1,9 @@
 """Gmail integration. The ONLY place in the engine that writes to the network.
 
-Three jobs:
+Jobs:
   * send_message  - send an approved reminder (refuses unless approved=True)
+  * create_gmail_draft - save a reminder as a Gmail draft (no send, no approval
+    gate, but still only triggered by an explicit draft intent)
   * prior_reminders - search Sent for prior chases of an invoice (dedupe + tier)
   * list_thread_replies - read replies for Slack context
 
@@ -24,10 +26,12 @@ from .templating import Draft
 __all__ = [
     "SentRef",
     "SendResult",
+    "DraftResult",
     "ReplyMsg",
     "GmailError",
     "NotApprovedError",
     "send_message",
+    "create_gmail_draft",
     "prior_reminders",
     "list_thread_replies",
     "build_search_query",
@@ -60,6 +64,14 @@ class SendResult:
 
 
 @dataclass(frozen=True)
+class DraftResult:
+    draft_id: str
+    message_id: str
+    thread_id: str
+    dry_run: bool
+
+
+@dataclass(frozen=True)
 class ReplyMsg:
     message_id: str
     from_addr: str
@@ -71,6 +83,7 @@ class Transport(Protocol):
     """Minimal surface the engine needs from a Gmail client."""
 
     def send(self, raw_b64: str) -> dict: ...
+    def create_draft(self, raw_b64: str) -> dict: ...
     def search(self, query: str) -> list[dict]: ...
     def get_message(self, message_id: str) -> dict: ...
     def list_thread(self, thread_id: str) -> list[dict]: ...
@@ -127,6 +140,37 @@ def send_message(
     return SendResult(
         message_id=str(result.get("id", "")),
         thread_id=str(result.get("threadId", "")),
+        dry_run=False,
+    )
+
+
+def create_gmail_draft(
+    draft: Draft,
+    *,
+    dry_run: bool,
+    creds=None,
+    transport: Transport | None = None,
+) -> DraftResult:
+    """Save a reminder as a Gmail draft. This is a second Gmail write path, but
+    it does NOT send: a draft sits in the mailbox until a human opens Gmail and
+    sends it. There is no approval gate here (a draft cannot reach a client on
+    its own); it is still only ever triggered by an explicit draft intent.
+
+    dry_run is checked FIRST: a dry-run touches no transport at all."""
+    if dry_run:
+        return DraftResult(
+            draft_id="dry-run",
+            message_id="dry-run",
+            thread_id="dry-run",
+            dry_run=True,
+        )
+    tp = transport or _default_transport(creds)
+    result = tp.create_draft(_raw_b64(draft))
+    message = result.get("message") or {}
+    return DraftResult(
+        draft_id=str(result.get("id", "")),
+        message_id=str(message.get("id", "")),
+        thread_id=str(message.get("threadId", "")),
         dry_run=False,
     )
 
@@ -212,6 +256,14 @@ def _default_transport(creds) -> Transport:  # pragma: no cover - requires googl
                 service.users()
                 .messages()
                 .send(userId="me", body={"raw": raw_b64})
+                .execute()
+            )
+
+        def create_draft(self, raw_b64: str) -> dict:
+            return (
+                service.users()
+                .drafts()
+                .create(userId="me", body={"message": {"raw": raw_b64}})
                 .execute()
             )
 

@@ -11,9 +11,9 @@ A tool that chases overdue invoices: reads overdue-and-unpaid invoices from Quic
 These are enforced by tests in `engine/tests/test_guardrails.py` and friends. Do not weaken them.
 
 1. **No money movement.** The engine only ever reads from the accounting source (QuickBooks/Wave). No mutations, no payment/transfer/refund code paths. `test_no_money_movement_symbols` scans for this.
-2. **No send without explicit approval.** `gmail.send_message` raises if `approved` is not `True`, before any network call. The Slack bot sends only on an explicit send intent. The CLI `send` refuses without `--approved-ids`.
+2. **No send without explicit approval.** `gmail.send_message` raises if `approved` is not `True`, before any network call. The Slack bot sends only on an explicit send intent. The CLI `send` refuses without `--approved-ids`. `gmail.create_gmail_draft` is a second Gmail write path (it saves a draft, never sends), reached only by an explicit `draft` intent in Slack; it has no approval gate because a draft cannot reach a client on its own, and the user still opens Gmail to send it by hand.
 3. **Resolve is source-only.** Whether to stop chasing is decided by the accounting tool's status (paid invoice drops out of the overdue query). A reply that claims payment is context only and never resolves.
-4. **Final tier never threatens.** No legal / collections / threat language. `templating.BLACKLIST` is enforced by `test_no_legal_or_collection_language`.
+4. **Final tier never threatens.** No legal / collections / threat language. `templating.BLACKLIST` is enforced by `test_no_legal_or_collection_language`, and at render time (`templating._assert_clean`) on every draft, so a custom template in `config/templates.yml` that smuggles in a blacklisted term, an em dash, or a subject missing the invoice number raises `TemplatingError` instead of rendering.
 5. **Public-safe repo.** No secrets, no PII, no state files committed. `test_no_secrets_committed` + `.gitignore` guard this.
 6. **No em dashes** in shipped output or docs. `test_no_em_dashes` enforces it.
 
@@ -27,10 +27,15 @@ engine/payup/
   lib/quickbooks.py   read-only QBO connector (overdue + unpaid). Default source of truth #1.
   lib/wave.py         read-only Wave connector (US/CA alternative). Same Invoice shape.
   lib/sources.py      source registry: name -> list_overdue_unpaid (default quickbooks).
-  lib/gmail.py        the ONLY network-write. send (approval-gated), prior_reminders
-                      (dedupe + tier count, source of truth #2), thread replies (context).
+  lib/gmail.py        the network-write surface. send (approval-gated),
+                      create_gmail_draft (saves a draft, no send, no approval gate),
+                      prior_reminders (dedupe + tier count, source of truth #2),
+                      thread replies (context).
   lib/escalation.py   pure tier selection (gentle/firm/final, min_gap hold).
-  lib/templating.py   pure draft rendering. Subject carries the invoice number (dedupe key).
+  lib/templating.py   pure draft rendering, config-driven (TemplateSet from
+                      config/templates.yml). Subject carries the invoice number
+                      (dedupe key); BLACKLIST + em-dash + invoice-number checks
+                      run on every rendered draft.
   lib/planner.py      pure: joins source + Gmail -> Action | Skip.
   lib/runner.py       build_plan (fetch + join) and execute (send approved only).
   lib/reply.py        pure reply classifier. Context only, never resolves.

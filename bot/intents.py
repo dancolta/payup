@@ -15,6 +15,7 @@ __all__ = ["Intent", "parse_intent"]
 _NUM_RE = re.compile(r"\b(\d{1,3})\b")
 _SEND_VERBS = ("send", "approve", "chase", "remind")
 _SKIP_VERBS = ("skip", "ignore", "hold", "snooze")
+_DRAFT_VERBS = ("draft",)
 _SHOW_WORDS = ("show overdue", "show", "overdue", "list", "what's overdue", "whats overdue", "status")
 _HELP_WORDS = ("help", "commands", "?", "how do i")
 
@@ -36,7 +37,7 @@ _QUESTION_LEADS = (
 _NAME_STOPWORDS = frozenset(
     {
         "and", "the", "for", "all", "send", "skip", "approve", "chase", "remind",
-        "ignore", "hold", "snooze", "invoice", "invoices", "please", "row", "rows",
+        "draft", "ignore", "hold", "snooze", "invoice", "invoices", "please", "row", "rows",
         "number", "numbers", "inc", "llc", "ltd", "corp", "company", "limited",
     }
 )
@@ -44,7 +45,7 @@ _NAME_STOPWORDS = frozenset(
 
 @dataclass(frozen=True)
 class Intent:
-    kind: str  # 'send' | 'skip' | 'show_overdue' | 'help' | 'unknown'
+    kind: str  # 'send' | 'draft' | 'skip' | 'show_overdue' | 'help' | 'unknown'
     ids: tuple[int, ...] = field(default=())  # 1-based row numbers
     all: bool = False
 
@@ -79,23 +80,25 @@ def parse_intent(text: str, batch: list[dict] | None = None) -> Intent:
 
     has_send = any(t.startswith(v) or f" {v} " in f" {t} " for v in _SEND_VERBS)
     has_skip = any(t.startswith(v) or f" {v} " in f" {t} " for v in _SKIP_VERBS)
+    has_draft = any(t.startswith(v) or f" {v} " in f" {t} " for v in _DRAFT_VERBS)
 
     # Help and show only when no action verb is present.
-    if not has_send and not has_skip:
+    if not has_send and not has_skip and not has_draft:
         if any(t == w or t.startswith(w) for w in _HELP_WORDS):
             return Intent("help")
         if any(w in t for w in _SHOW_WORDS):
             return Intent("show_overdue")
         return Intent("unknown")
 
-    # If both a send and skip verb appear, it is ambiguous -> clarify.
-    if has_send and has_skip:
+    # Action verbs are mutually exclusive: any combination is ambiguous -> clarify.
+    if (has_send + has_skip + has_draft) > 1:
         return Intent("unknown")
 
-    kind = "send" if has_send else "skip"
+    kind = "send" if has_send else "draft" if has_draft else "skip"
 
-    # HITL guard: a send that is negated or phrased as a question is not a send.
-    if kind == "send" and (_NEGATION_RE.search(t) or _is_question(t)):
+    # HITL guard: a send/draft that is negated or phrased as a question is not a
+    # command. Drafting writes to Gmail too, so it gets the same guards as send.
+    if kind in ("send", "draft") and (_NEGATION_RE.search(t) or _is_question(t)):
         return Intent("unknown")
 
     if re.search(r"\ball\b", t):

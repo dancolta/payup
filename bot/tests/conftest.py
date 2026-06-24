@@ -20,6 +20,7 @@ def load_wave(name: str = "wave_overdue.json") -> dict:
 class FakeGmail:
     def __init__(self, search_results=None, thread_results=None):
         self.sent: list[str] = []
+        self.drafted: list[str] = []
         self._search_results = search_results or []
         self._thread_results = thread_results or []
         self.last_query = None
@@ -27,6 +28,14 @@ class FakeGmail:
     def send(self, raw_b64: str) -> dict:
         self.sent.append(raw_b64)
         return {"id": f"msg_{len(self.sent)}", "threadId": f"thr_{len(self.sent)}"}
+
+    def create_draft(self, raw_b64: str) -> dict:
+        self.drafted.append(raw_b64)
+        n = len(self.drafted)
+        return {
+            "id": f"draft_{n}",
+            "message": {"id": f"dmsg_{n}", "threadId": f"dthr_{n}"},
+        }
 
     def search(self, query: str):
         self.last_query = query

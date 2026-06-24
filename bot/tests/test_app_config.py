@@ -4,6 +4,7 @@ window). Importing bot.app is safe without the [bot] extra: slack_bolt is only
 imported inside main()."""
 
 from payup.lib.escalation import EscalationConfig
+from payup.lib.templating import TemplateSet
 
 import bot.app as app
 
@@ -31,3 +32,20 @@ def test_load_escalation_defaults_when_unset(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("PAYUP_ESCALATION_CONFIG", "/nonexistent/escalation.yml")
     assert app._load_escalation() == EscalationConfig()
+
+
+def test_load_templates_from_yaml(monkeypatch, tmp_path):
+    yml = tmp_path / "templates.yml"
+    yml.write_text(
+        'gentle:\n  subject: "Nudge: Invoice #{invoice_number}"\n', encoding="utf-8"
+    )
+    monkeypatch.setenv("PAYUP_TEMPLATES_CONFIG", str(yml))
+    ts = app._load_templates()
+    assert ts.gentle_subject == "Nudge: Invoice #{invoice_number}"
+    # Untouched fields stay None (built-in default at render time).
+    assert ts.firm_subject is None
+
+
+def test_load_templates_defaults_when_unset(monkeypatch):
+    monkeypatch.setenv("PAYUP_TEMPLATES_CONFIG", "/nonexistent/templates.yml")
+    assert app._load_templates() == TemplateSet()

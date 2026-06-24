@@ -86,6 +86,35 @@ def test_stopword_in_name_not_matched():
     assert i.kind == "send" and i.ids == (1, 3)
 
 
+def test_draft_specific_numbers():
+    i = parse_intent("draft 1 and 3", BATCH)
+    assert i.kind == "draft" and i.ids == (1, 3) and not i.all
+
+
+def test_draft_all():
+    i = parse_intent("draft all", BATCH)
+    assert i.kind == "draft" and i.all is True
+
+
+def test_draft_by_name():
+    i = parse_intent("draft Delta", BATCH)
+    assert i.kind == "draft" and i.ids == (3,)
+
+
+def test_bare_draft_is_unknown():
+    # "draft" with no target must NOT become an implicit draft-all.
+    assert parse_intent("draft", BATCH).kind == "unknown"
+
+
+def test_negated_or_question_draft_is_unknown():
+    assert parse_intent("do not draft all", BATCH).kind == "unknown"
+    assert parse_intent("should I draft 1?", BATCH).kind == "unknown"
+
+
+def test_send_and_draft_combo_is_unknown():
+    assert parse_intent("send 1 and draft 3", BATCH).kind == "unknown"
+
+
 def test_strips_slack_mention():
     # An @mention prefix (Slack markup) must not break a command.
     i = parse_intent("<@U12345> send all", BATCH)

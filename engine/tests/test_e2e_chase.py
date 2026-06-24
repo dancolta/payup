@@ -91,6 +91,64 @@ def test_build_plan_uses_wide_history_window(monkeypatch):
     assert "newer_than:90d" in fake.last_query
 
 
+def test_draft_mode_creates_drafts_not_sends(monkeypatch):
+    _wire_wave(monkeypatch)
+    fake = FakeGmail(search_results=[])
+    plan = runner.build_plan(
+        now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake
+    )
+    actions = [p for p in plan if isinstance(p, Action)]
+    approved = {a.invoice.invoice_id for a in actions}
+    drafted, skipped = runner.execute(
+        plan, approved, gmail_transport=fake, dry_run=False, mode="draft"
+    )
+    assert sorted(drafted) == ["0998", "1001", "1051"]
+    assert len(fake.drafted) == 3
+    assert fake.sent == []  # drafting never sends
+
+
+def test_dry_run_draft_creates_nothing(monkeypatch):
+    _wire_wave(monkeypatch)
+    fake = FakeGmail(search_results=[])
+    plan = runner.build_plan(
+        now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake
+    )
+    approved = {p.invoice.invoice_id for p in plan if isinstance(p, Action)}
+    runner.execute(plan, approved, gmail_transport=fake, dry_run=False, mode="draft")
+    assert len(fake.drafted) == 3
+    # A separate dry-run draft creates nothing.
+    fake2 = FakeGmail(search_results=[])
+    plan2 = runner.build_plan(
+        now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake2
+    )
+    approved2 = {p.invoice.invoice_id for p in plan2 if isinstance(p, Action)}
+    runner.execute(plan2, approved2, gmail_transport=fake2, dry_run=True, mode="draft")
+    assert fake2.drafted == []
+    assert fake2.sent == []
+
+
+def test_drafted_invoice_still_appears_next_run(monkeypatch):
+    # A draft has not been sent, so it does not create a Sent-mail record and
+    # must not dedupe out of the next run.
+    _wire_wave(monkeypatch)
+    fake = FakeGmail(search_results=[])  # no priors, ever (drafts are not in Sent)
+
+    plan1 = runner.build_plan(
+        now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake
+    )
+    delta = next(p for p in plan1 if p.invoice.invoice_number == "0998")
+    runner.execute(
+        plan1, {delta.invoice.invoice_id}, gmail_transport=fake, dry_run=False, mode="draft"
+    )
+    assert len(fake.drafted) == 1
+
+    plan2 = runner.build_plan(
+        now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake
+    )
+    by_num = {p.invoice.invoice_number: p for p in plan2}
+    assert isinstance(by_num["0998"], Action)  # still chasable, a draft did not dedupe
+
+
 def test_second_run_after_send_does_not_resend(monkeypatch):
     """Simulate: run 1 sends #0998; run 2 sees that prior in Gmail and skips it."""
     _wire_wave(monkeypatch)
@@ -114,3 +172,13 @@ def test_second_run_after_send_does_not_resend(monkeypatch):
     plan2 = runner.build_plan(now=NOW, token="t", business_id="SANDBOX-DEMO-0001", source_name="wave", gmail_transport=fake)
     by_num = {p.invoice.invoice_number: p for p in plan2}
     assert isinstance(by_num["0998"], Skip)  # already chased today
+
+
+def test_unknown_mode_raises():
+    # Fail closed: an unknown execute mode must raise, never fall through to send.
+    raised = False
+    try:
+        runner.execute([], set(), mode="garbage")
+    except ValueError:
+        raised = True
+    assert raised, "unknown mode must raise ValueError"

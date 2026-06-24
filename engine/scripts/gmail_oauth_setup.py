@@ -3,9 +3,12 @@
 
 Run once during setup:  python engine/scripts/gmail_oauth_setup.py
 
-Requires the [bot] extra (google-auth-oauthlib). PayUp asks only for send +
-read scopes. The token is stored with owner-only permissions and is never
-committed.
+Requires the [bot] extra (google-auth-oauthlib). PayUp asks for send + read +
+compose scopes (compose lets it save drafts you review and send by hand). The
+token is stored with owner-only permissions and is never committed.
+
+If you set PayUp up before draft support existed, the compose scope is new:
+delete config/token.json and run this again to re-consent.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import sys
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.compose",
 ]
 
 
@@ -51,6 +55,10 @@ def main() -> int:
     finally:
         os.close(fd)
     print(f"Saved Gmail token to {token_path} (owner-only). Setup complete.")
+    print(
+        "Scopes granted: gmail.send, gmail.readonly, gmail.compose. If you are "
+        "upgrading an older setup, this re-consent added gmail.compose (for drafts)."
+    )
     return 0
 
 

@@ -16,7 +16,7 @@ from datetime import date
 from payup.lib import quickbooks
 from payup.lib.escalation import EscalationConfig
 from payup.lib.planner import PayupConfig
-from payup.lib.templating import TemplatingConfig
+from payup.lib.templating import TemplateSet, TemplatingConfig
 
 from .handlers import BotDeps, ChaseSession
 from .scheduler import loop
@@ -40,7 +40,12 @@ def _load_gmail_creds():  # pragma: no cover - requires google libs + a real tok
             f"Gmail token not found at {token_path}. Run: python engine/scripts/gmail_oauth_setup.py"
         )
     return Credentials.from_authorized_user_file(
-        token_path, ["https://www.googleapis.com/auth/gmail.send", "https://www.googleapis.com/auth/gmail.readonly"]
+        token_path,
+        [
+            "https://www.googleapis.com/auth/gmail.send",
+            "https://www.googleapis.com/auth/gmail.readonly",
+            "https://www.googleapis.com/auth/gmail.compose",
+        ],
     )
 
 
@@ -60,6 +65,13 @@ def _load_escalation() -> EscalationConfig:
         firm_max_days=_ovr("PAYUP_FIRM_MAX_DAYS", base.firm_max_days),
         final_min_priors=_ovr("PAYUP_FINAL_MIN_PRIORS", base.final_min_priors),
     )
+
+
+def _load_templates() -> TemplateSet:
+    """Reminder templates: load config/templates.yml if present (and pyyaml is
+    installed), else the built-in defaults. Mirrors _load_escalation."""
+    path = os.environ.get("PAYUP_TEMPLATES_CONFIG", "config/templates.yml")
+    return TemplateSet.load(path if os.path.exists(path) else None)
 
 
 def _build_deps() -> BotDeps:  # pragma: no cover
@@ -89,6 +101,7 @@ def _build_deps() -> BotDeps:  # pragma: no cover
         templating=TemplatingConfig(
             sender_name=os.environ.get("PAYUP_SENDER", "Accounts"),
             business_name=os.environ.get("PAYUP_BUSINESS_NAME", "our team"),
+            templates=_load_templates(),
         ),
     )
     return BotDeps(

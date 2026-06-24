@@ -65,26 +65,43 @@ def execute(
     gmail_creds=None,
     gmail_transport=None,
     dry_run: bool = True,
+    mode: str = "send",
 ) -> tuple[list[str], list[str]]:
-    """Send only the approved actions. Returns (sent_numbers, skipped_numbers).
+    """Act on the approved actions. Returns (acted_numbers, skipped_numbers).
 
-    An action that is not in approved_ids is never sent. This is the HITL gate.
+    `mode` selects the Gmail write path:
+      * "send" (default): send the approved reminders (the HITL send gate).
+      * "draft": save the approved reminders as Gmail drafts (no send). A draft
+        has not been sent, so the caller must not treat a draft as a chase.
+
+    An action that is not in approved_ids is never acted on. This is the HITL gate.
     """
+    if mode not in ("send", "draft"):
+        # Fail closed: an unknown mode must never silently fall through to sending.
+        raise ValueError(f"unknown execute mode {mode!r}; expected 'send' or 'draft'")
     approved = set(approved_ids)
-    sent: list[str] = []
+    acted: list[str] = []
     skipped: list[str] = []
     for item in plan:
         if not isinstance(item, Action):
             continue
         if item.invoice.invoice_id in approved:
-            gmail.send_message(
-                item.draft,
-                approved=True,
-                dry_run=dry_run,
-                creds=gmail_creds,
-                transport=gmail_transport,
-            )
-            sent.append(item.invoice.invoice_number)
+            if mode == "draft":
+                gmail.create_gmail_draft(
+                    item.draft,
+                    dry_run=dry_run,
+                    creds=gmail_creds,
+                    transport=gmail_transport,
+                )
+            else:
+                gmail.send_message(
+                    item.draft,
+                    approved=True,
+                    dry_run=dry_run,
+                    creds=gmail_creds,
+                    transport=gmail_transport,
+                )
+            acted.append(item.invoice.invoice_number)
         else:
             skipped.append(item.invoice.invoice_number)
-    return sent, skipped
+    return acted, skipped

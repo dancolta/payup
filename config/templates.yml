@@ -1,0 +1,52 @@
+# Reminder email templates. Loaded by the bot at startup (when pyyaml is
+# installed via the [bot] extra) and pointed at by PAYUP_TEMPLATES_CONFIG.
+# These are the shipped defaults (also baked into templating.TemplateSet); edit
+# them to change wording. Any tier or field you omit keeps its built-in default.
+#
+# Placeholders you can use in subject/body:
+#   {customer_name} {invoice_number} {amount} {due_date}
+#   {sender_name} {business_name}
+#
+# Safety, enforced at render time on every draft (custom ones included):
+#   * the subject MUST contain {invoice_number} (it is the Gmail dedupe key),
+#   * no legal / collections / threat language (see templating.BLACKLIST),
+#   * no em dashes anywhere. Use commas, periods, or restructure.
+
+gentle:
+  subject: "Reminder: Invoice #{invoice_number}"
+  body: |-
+    Hi {customer_name},
+
+    Just a friendly heads up that invoice #{invoice_number} for {amount} was due on {due_date} and looks still open on our side.
+
+    It may have slipped through. If it is already on its way, thank you and please ignore this note. Otherwise, a quick update on timing would be great.
+
+    Thanks so much,
+    {sender_name}
+    {business_name}
+
+firm:
+  subject: "Payment due: Invoice #{invoice_number}"
+  body: |-
+    Hi {customer_name},
+
+    Following up on invoice #{invoice_number} for {amount}, which was due on {due_date} and is now past due.
+
+    Could you let me know the expected payment date? If anything is blocking it on your end, tell me and I will help sort it out.
+
+    Appreciate your help,
+    {sender_name}
+    {business_name}
+
+final:
+  subject: "Final reminder: Invoice #{invoice_number}"
+  body: |-
+    Hi {customer_name},
+
+    This is a final reminder that invoice #{invoice_number} for {amount}, due on {due_date}, remains unpaid.
+
+    Please arrange payment, or reply with a firm date so we can close this out. If you have already paid, let me know and I will confirm on our side.
+
+    Thank you,
+    {sender_name}
+    {business_name}

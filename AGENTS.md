@@ -34,11 +34,16 @@ PAYUP_LIVE=0 python -m bot.app   # dry-run: drafts but never sends
    transfer, or refund code paths, and no GraphQL mutations.
 2. **No send without explicit approval.** `gmail.send_message` raises unless `approved` is
    exactly `True`, before any network call. The Slack bot sends only on an explicit send
-   intent. The CLI `send` refuses without `--approved-ids`.
+   intent. The CLI `send` refuses without `--approved-ids`. `gmail.create_gmail_draft` is a
+   second Gmail write path that saves a draft (never sends), reached only by an explicit
+   `draft` intent in Slack; a draft cannot reach a client on its own, so it has no approval
+   gate, and the user still sends it by hand from Gmail.
 3. **Resolve is source-only.** Chasing stops only because an invoice drops out of the overdue
    query (marked paid). A reply that claims payment is context only and never resolves.
 4. **Final tier never threatens.** No legal, collections, or threat language
-   (`templating.BLACKLIST`).
+   (`templating.BLACKLIST`). Enforced at render time on every draft (including custom
+   templates from `config/templates.yml`): a blacklisted term, an em dash, or a subject
+   missing the invoice number raises `TemplatingError`.
 5. **Public-safe repo.** No secrets, no PII, no state files committed.
 6. **No em dashes** in shipped output or docs. Use commas, periods, or restructure.
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from .planner import Action, Skip
 from .templating import _format_amount
 
-__all__ = ["render_batch", "render_confirmation"]
+__all__ = ["render_batch", "render_confirmation", "render_draft_confirmation"]
 
 
 def render_batch(plan: list[Action | Skip], *, now=None) -> str:
@@ -46,6 +46,19 @@ def render_confirmation(sent: list[str], skipped: list[str]) -> str:
         parts.append(f"Sent {len(sent)} reminder(s): {', '.join(sent)}.")
     else:
         parts.append("Sent 0 reminders.")
+    if skipped:
+        parts.append(f"Skipped {len(skipped)}: {', '.join(skipped)}.")
+    return " ".join(parts)
+
+
+def render_draft_confirmation(drafted: list[str], skipped: list[str]) -> str:
+    """Render the post-draft summary. Mirrors render_confirmation, but for drafts
+    saved to Gmail (not sent). No em dashes."""
+    parts = []
+    if drafted:
+        parts.append(f"Drafted {len(drafted)} reminder(s): {', '.join(drafted)}.")
+    else:
+        parts.append("Drafted 0 reminders.")
     if skipped:
         parts.append(f"Skipped {len(skipped)}: {', '.join(skipped)}.")
     return " ".join(parts)

@@ -25,6 +25,7 @@ HELP_TEXT = (
     '  "show overdue"   list invoices ready to chase\n'
     '  "send all"       send every reminder in the batch\n'
     '  "send 1 and 3"   send specific rows\n'
+    '  "draft all"      save reminders as Gmail drafts to review (nothing is sent)\n'
     '  "skip Delta"     drop a row from this batch (nothing is sent)\n'
     "Nothing is ever sent until you say send."
 )
@@ -173,6 +174,50 @@ class ChaseSession:
             listed = ", ".join("#" + d for d in sorted(dropped)) or "nothing"
             return f"Skipped {listed}. Those will not be sent in this batch. Nothing was sent."
 
+        if intent.kind == "draft":
+            # Save reminders as Gmail drafts. This writes to Gmail but never
+            # sends: a draft sits in the mailbox for the user to open, edit, and
+            # send by hand. A draft is NOT a chase, so we do NOT clear the batch
+            # (the invoice is still un-chased until the draft is actually sent).
+            if not rows:
+                return 'No batch yet. Say "show overdue" first.'
+            if intent.all:
+                approved = {r["invoice_id"] for r in rows}
+            else:
+                approved = {r["invoice_id"] for r in rows if r["n"] in intent.ids}
+            plan = self._plans.get(channel, [])
+            drafted, skipped = runner.execute(
+                plan,
+                approved,
+                gmail_creds=self.deps.gmail_creds,
+                gmail_transport=self.deps.gmail_transport,
+                dry_run=self.deps.dry_run,
+                mode="draft",
+            )
+            if not self.deps.dry_run and drafted and self.deps.ledger_path:
+                ledger.append_run(
+                    {
+                        "date": self.deps.now().isoformat(),
+                        "source": self.deps.source_name,
+                        "action": "draft",
+                        "drafted": drafted,
+                        "skipped": skipped,
+                    },
+                    self.deps.ledger_path,
+                )
+            base = output.render_draft_confirmation(
+                [f"#{d}" for d in drafted], [f"#{s}" for s in skipped]
+            )
+            if self.deps.dry_run:
+                return "[dry-run] " + base
+            note = ""
+            if drafted:
+                note = (
+                    " Open Gmail to review, edit, and send them. "
+                    "Drafts are not tracked as chased until you actually send."
+                )
+            return base + note
+
         # intent.kind == "send"  -> the only path that may send
         if not rows:
             return 'No batch yet. Say "show overdue" first.'
@@ -202,6 +247,7 @@ class ChaseSession:
                     {
                         "date": self.deps.now().isoformat(),
                         "source": self.deps.source_name,
+                        "action": "send",
                         "sent": sent,
                         "skipped": skipped,
                     },
