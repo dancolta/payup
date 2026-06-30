@@ -70,6 +70,8 @@ without approval, sandbox isolation, no secrets / em dashes / PII). New behavior
 
 When doing setup, verification, or demo prep for the maintainer, run shell commands yourself rather than printing command lists for them to copy-paste. The maintainer handles only browser-only steps (OAuth consent, sign-in, third-party dashboards). Everything runnable from a shell (deps, file moves, scripts, tests, git) is the agent's job.
 
+After any agreed change to behavior, commands, config, or setup, update `README.md` in the same commit and push it (and `CLAUDE.md` / `AGENTS.md` when the contract changed). The public docs must never lag the shipped behavior.
+
 ## Layout
 
 ```

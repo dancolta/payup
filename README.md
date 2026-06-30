@@ -173,6 +173,10 @@ PayUp searches your Gmail Sent mail keyed on the invoice number to count prior r
 
 PayUp's guardrails are enforced by tests: no money-movement code paths exist, the final reminder tier is blocked from legal or collections language, and no secrets or PII are committed to the repo. It is MIT-licensed and the full source is public.
 
+### What if PayUp stops responding in Slack?
+
+PayUp goes quiet only when it cannot reach your accounting source, almost always an expired access token. It replies in Slack with a clear "could not reach your accounting source" message rather than failing silently. Refresh your QuickBooks or Wave token (re-run `/payup-setup`, or re-mint from the OAuth Playground) and try `show overdue` again.
+
 ## Development
 
 ```bash

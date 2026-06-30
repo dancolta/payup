@@ -70,3 +70,5 @@ PYTHONPATH=engine python3 -m payup.cli plan-chase \
 ## Operating this repo for the maintainer
 
 When doing setup, verification, or demo prep for the maintainer, run shell commands yourself with your execution tool. Do not hand the maintainer lists of terminal commands to copy-paste. The maintainer drives only the browser-only steps (OAuth consent screens, account sign-in, third-party dashboards). Anything runnable from a shell (installing deps, moving files, running scripts and tests, git) is the agent's job.
+
+After any change to behavior, commands, config, or setup that the maintainer has agreed to, update `README.md` in the same commit and push it (and `CLAUDE.md` / `AGENTS.md` when the contract itself changed). The public docs must never lag the shipped behavior.
