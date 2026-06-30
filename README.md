@@ -118,7 +118,7 @@ These are enforced by tests, not just promised in docs:
 
 - **Human-in-the-loop.** Nothing sends without an explicit `send` command. The daily timer only posts the batch.
 - **Never moves money.** The engine only reads from the accounting source. There are no payment, transfer, or refund code paths.
-- **No-nag gap.** An invoice chased in the last `min_gap_days` (default 7) is held out of the batch.
+- **No-nag gap.** An invoice chased in the last `min_gap_days` (default 7) is held out of the batch. `show overdue` lists those held invoices in a separate "already nudged" section, with the date you last sent each one, so the ready-to-chase list and the wait-it-out list are never confused.
 - **Dedupe from your Sent mail.** PayUp counts prior reminders by searching your Gmail Sent for the invoice number, so it cannot double-count or re-nag, even across restarts.
 - **Resolve-on-paid.** A paid invoice drops out of the overdue query automatically. No manual cleanup.
 - **Final tier never threatens.** Legal and collections language is blacklisted and blocked at render time, including in your custom templates.

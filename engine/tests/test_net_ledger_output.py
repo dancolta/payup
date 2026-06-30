@@ -73,3 +73,20 @@ def test_render_confirmation():
     assert "Sent 2" in text
     assert "Skipped 1" in text
     assert "—" not in text
+
+
+def test_render_batch_lists_already_nudged_separately():
+    # Held (already-nudged) invoices appear as their own labeled list with the
+    # last-sent date, separate from the ready-to-chase batch.
+    from payup.lib.planner import Skip
+
+    inv_a = _inv("1001", 3, 240000)
+    action = Action(invoice=inv_a, tier=Tier.GENTLE, draft=render_email(inv_a, Tier.GENTLE))
+    inv_b = _inv("0998", 6, 90000)
+    held = Skip(invoice=inv_b, reason="within min_gap", last_sent=date(2026, 6, 1))
+
+    text = output.render_batch([action, held], now=NOW)
+    assert "ready to chase" in text          # the actionable batch header
+    assert "Already nudged" in text          # the separate held list
+    assert "#0998" in text and "last nudged 3d ago" in text
+    assert "—" not in text

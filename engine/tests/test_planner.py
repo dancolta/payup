@@ -45,6 +45,7 @@ def test_within_gap_is_skipped():
     plan = plan_chase([inv], priors, now=NOW)
     assert isinstance(plan[0], Skip)
     assert plan[0].reason == "within min_gap"
+    assert plan[0].last_sent == date(2026, 6, 2)  # surfaces when it was last nudged
 
 
 def test_mixed_batch():

@@ -39,6 +39,7 @@ class Skip:
 
     invoice: Invoice
     reason: str
+    last_sent: date | None = None  # date of the most recent prior reminder, if any
 
 
 def plan_chase(
@@ -69,7 +70,7 @@ def plan_chase(
             ) if days_overdue >= 1 else "not yet due"
             if priors and days_since_last is not None and days_since_last < cfg.escalation.min_gap_days:
                 reason = "within min_gap"
-            plan.append(Skip(invoice=inv, reason=reason))
+            plan.append(Skip(invoice=inv, reason=reason, last_sent=priors[-1] if priors else None))
             continue
 
         draft = render_email(inv, tier, cfg.templating)

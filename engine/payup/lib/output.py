@@ -13,29 +13,46 @@ __all__ = ["render_batch", "render_confirmation", "render_draft_confirmation"]
 
 
 def render_batch(plan: list[Action | Skip], *, now=None) -> str:
-    """Render the proposed chase batch as a numbered list for approval."""
+    """Render the proposed chase batch for approval, plus a separate list of
+    invoices already nudged (held inside the no-nag window) so the two never get
+    confused. The 'already nudged' list shows when each one was last sent."""
     actions = [p for p in plan if isinstance(p, Action)]
-    skips = [p for p in plan if isinstance(p, Skip)]
+    nudged = [p for p in plan if isinstance(p, Skip) and p.last_sent is not None]
 
-    if not actions:
-        msg = "No invoices to chase right now."
-        if skips:
-            msg += f" ({len(skips)} overdue but skipped: within the no-nag window.)"
-        return msg
+    if not actions and not nudged:
+        return "No invoices to chase right now."
 
-    lines = [f"PayUp found {len(actions)} invoice(s) ready to chase. Reply to approve.", ""]
-    for i, act in enumerate(actions, start=1):
-        inv = act.invoice
-        amount = _format_amount(inv.amount_due_cents, inv.currency)
-        days = (now - inv.due_date).days if now else "?"
+    lines: list[str] = []
+    if actions:
+        lines.append(f"PayUp found {len(actions)} invoice(s) ready to chase. Reply to approve.")
+        lines.append("")
+        for i, act in enumerate(actions, start=1):
+            inv = act.invoice
+            amount = _format_amount(inv.amount_due_cents, inv.currency)
+            days = (now - inv.due_date).days if now else "?"
+            lines.append(
+                f"{i}. {inv.customer_name} | #{inv.invoice_number} | {amount} "
+                f"| {act.tier.value} | {days}d late"
+            )
+        lines.append("")
+        lines.append('Reply: "send all", "send 1 and 3", "draft all", or "skip Delta".')
+    else:
+        lines.append("Nothing ready to chase right now.")
+
+    if nudged:
+        lines.append("")
         lines.append(
-            f"{i}. {inv.customer_name} | #{inv.invoice_number} | {amount} "
-            f"| {act.tier.value} | {days}d late"
+            f"Already nudged, waiting out the no-nag gap ({len(nudged)}, not in the list above):"
         )
-    lines.append("")
-    lines.append('Reply: "send all", "send 1 and 3", "skip Delta", or "show overdue".')
-    if skips:
-        lines.append(f"({len(skips)} other overdue invoice(s) skipped: still inside the no-nag window.)")
+        for s in nudged:
+            inv = s.invoice
+            if now and s.last_sent is not None:
+                ago = (now - s.last_sent).days
+                when = "today" if ago <= 0 else f"{ago}d ago"
+                lines.append(f"- {inv.customer_name} | #{inv.invoice_number} | last nudged {when}")
+            else:
+                lines.append(f"- {inv.customer_name} | #{inv.invoice_number}")
+
     return "\n".join(lines)
 
 
