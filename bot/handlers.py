@@ -135,17 +135,27 @@ class ChaseSession:
         return rows
 
     def refresh(self, channel: str) -> str:
-        plan = runner.build_plan(
-            now=self.deps.now(),
-            token=self.deps.access_token(),
-            business_id=self.deps.business_id,
-            source_name=self.deps.source_name,
-            gmail_creds=self.deps.gmail_creds,
-            gmail_transport=self.deps.gmail_transport,
-            history_days=self.deps.history_days,
-            source_kwargs=self.deps.source_kwargs,
-            cfg=self.deps.cfg,
-        )
+        try:
+            plan = runner.build_plan(
+                now=self.deps.now(),
+                token=self.deps.access_token(),
+                business_id=self.deps.business_id,
+                source_name=self.deps.source_name,
+                gmail_creds=self.deps.gmail_creds,
+                gmail_transport=self.deps.gmail_transport,
+                history_days=self.deps.history_days,
+                source_kwargs=self.deps.source_kwargs,
+                cfg=self.deps.cfg,
+            )
+        except Exception:  # noqa: BLE001 - report in chat, never die silently
+            import traceback
+
+            traceback.print_exc()
+            return (
+                "PayUp could not reach your accounting source. The access token has "
+                "likely expired. Refresh your QuickBooks or Wave token (or re-run "
+                "/payup-setup), then try `show overdue` again."
+            )
         self._plans[channel] = plan
         return output.render_batch(plan, now=self.deps.now())
 

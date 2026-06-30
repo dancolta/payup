@@ -208,3 +208,16 @@ def test_draft_records_to_ledger_with_action_draft(monkeypatch, fake_gmail, tmp_
     rec = json.loads(lines[0])
     assert rec["action"] == "draft"
     assert len(rec["drafted"]) == 3
+
+
+def test_refresh_reports_source_error_instead_of_silence(session, monkeypatch):
+    # A failing accounting source/token must produce a clear chat reply, not silence.
+    from payup.lib import runner
+
+    def boom(**kwargs):
+        raise RuntimeError("token refresh failed (400)")
+
+    monkeypatch.setattr(runner, "build_plan", boom)
+    out = session.refresh(CH)
+    assert "could not reach" in out.lower()
+    assert session._gmail.sent == []
