@@ -3,7 +3,7 @@
   "name": "payup",
   "displayName": "PayUp",
   "version": "0.1.0",
-  "description": "Chase overdue invoices conversationally from Slack. Reads overdue-and-unpaid invoices from QuickBooks (or Wave), drafts tiered reminders (gentle, firm, final), sends via Gmail behind a human-in-the-loop gate, and stops automatically when the invoice is marked paid. Replaces the AR/reminder slice of Bill.com. Never moves money. Setup in Claude Code; operate from Slack.",
+  "description": "Chase overdue invoices conversationally from Slack. Reads overdue-and-unpaid invoices from QuickBooks (or Wave), drafts tiered reminders (gentle, firm, final), sends via Gmail behind a human-in-the-loop gate, and stops automatically when the invoice is marked paid. A human-in-the-loop alternative to Bill.com-style dunning. Never moves money. Setup in Claude Code; operate from Slack.",
   "author": {
     "name": "Dan Colta",
     "url": "https://github.com/dancolta"

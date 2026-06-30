@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="320" viewBox="0 0 960 320" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <rect width="960" height="320" fill="#ffffff"/>
+  <style>
+    .box { fill:#1f2933; rx:12; }
+    .label { fill:#ffffff; font-size:17px; font-weight:600; }
+    .sub { fill:#9aa5b1; font-size:12px; }
+    .flow { fill:#52606d; font-size:12px; font-weight:600; }
+    .accent { fill:#16a34a; }
+    .pill { fill:#e6f4ea; }
+    .pilltext { fill:#137a3a; font-size:12px; font-weight:600; }
+  </style>
+
+  <!-- boxes -->
+  <rect x="20"  y="96" width="180" height="92" rx="12" fill="#1f2933"/>
+  <text x="110" y="138" text-anchor="middle" class="label">QuickBooks</text>
+  <text x="110" y="160" text-anchor="middle" class="sub">or Wave (read-only)</text>
+
+  <rect x="290" y="96" width="160" height="92" rx="12" fill="#16a34a"/>
+  <text x="370" y="138" text-anchor="middle" class="label">PayUp</text>
+  <text x="370" y="160" text-anchor="middle" class="sub" fill="#d7f0df">plan + draft</text>
+
+  <rect x="540" y="96" width="180" height="92" rx="12" fill="#1f2933"/>
+  <text x="630" y="132" text-anchor="middle" class="label">Slack</text>
+  <text x="630" y="156" text-anchor="middle" class="sub">you approve</text>
+
+  <rect x="810" y="96" width="130" height="92" rx="12" fill="#1f2933"/>
+  <text x="875" y="132" text-anchor="middle" class="label">Gmail</text>
+  <text x="875" y="156" text-anchor="middle" class="sub">send / draft</text>
+
+  <!-- arrows -->
+  <line x1="200" y1="142" x2="285" y2="142" stroke="#52606d" stroke-width="3"/>
+  <polygon points="285,142 275,137 275,147" fill="#52606d"/>
+  <text x="242" y="132" text-anchor="middle" class="flow">overdue</text>
+
+  <line x1="450" y1="142" x2="535" y2="142" stroke="#52606d" stroke-width="3"/>
+  <polygon points="535,142 525,137 525,147" fill="#52606d"/>
+  <text x="492" y="132" text-anchor="middle" class="flow">batch</text>
+
+  <line x1="720" y1="142" x2="805" y2="142" stroke="#52606d" stroke-width="3"/>
+  <polygon points="805,142 795,137 795,147" fill="#52606d"/>
+  <text x="762" y="132" text-anchor="middle" class="flow">approved</text>
+
+  <!-- resolve loop -->
+  <text x="480" y="44" text-anchor="middle" class="flow" fill="#16a34a">paid invoice drops out automatically (resolve-on-paid)</text>
+  <path d="M875 96 C875 56 110 56 110 92" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="5,5"/>
+  <polygon points="110,92 105,82 115,82" fill="#16a34a"/>
+
+  <!-- guarantee pills -->
+  <rect x="200" y="244" width="160" height="34" rx="17" fill="#e6f4ea"/>
+  <text x="280" y="266" text-anchor="middle" class="pilltext">no payment rails</text>
+  <rect x="380" y="244" width="140" height="34" rx="17" fill="#e6f4ea"/>
+  <text x="450" y="266" text-anchor="middle" class="pilltext">no database</text>
+  <rect x="540" y="244" width="220" height="34" rx="17" fill="#e6f4ea"/>
+  <text x="650" y="266" text-anchor="middle" class="pilltext">human-in-the-loop on every send</text>
+</svg>

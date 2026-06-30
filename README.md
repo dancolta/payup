@@ -1,142 +1,192 @@
-# PayUp: chase overdue invoices from Slack
+<div align="center">
 
-> Replace Bill.com's AR/reminder slice with a near-$0 tool wired to your real stack. **It never moves money.**
+<img src="docs/assets/payup-logo.jpg" alt="PayUp" width="120" />
 
-PayUp watches **QuickBooks** for invoices that are overdue *and still unpaid*, drafts escalating-but-polite reminders (gentle, firm, final), and sends them via **Gmail**, but only after you approve, conversationally, from **Slack**. When the invoice is marked paid, chasing stops automatically. (Wave is supported too, for US/Canada businesses.)
+# PayUp
 
-- **Set it up in Claude Code.** Wire your QuickBooks token, Gmail, and tiers with the `/payup-setup` skill.
-- **Run it from Slack.** An always-on bot posts your overdue batch; you reply `send 1 and 3`, `skip Delta`, or `show overdue`. Nothing sends until you say so.
-- **No database.** Your accounting tool and Gmail are the source of truth.
+**Chase overdue invoices from Slack. PayUp reads QuickBooks or Wave, drafts polite escalating reminders, and sends them via Gmail only after you approve.**
+
+[![CI](https://github.com/dancolta/payup/actions/workflows/ci.yml/badge.svg)](https://github.com/dancolta/payup/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-16a34a.svg)](LICENSE) [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-5436DA.svg)](#install)
+
+**Install:** add the plugin in Claude Code and run `/payup-setup` · **Operate:** from Slack
+
+<img src="docs/assets/demo.gif" alt="PayUp in Slack: show overdue, draft, send after approval" width="720" />
+
+</div>
+
+> **What PayUp is not:** auto-dunning, a collections bot, a money-mover, or a mass-emailer. Nothing leaves your outbox until you approve it in Slack, the accounting side is read-only, and the firm "final" reminder is blocked from using legal or collections language.
+
+PayUp does the part of invoice-chasing you hate (noticing who is overdue, writing the nudge) and leaves the part you want to keep (deciding what actually goes to a client). It is a human-in-the-loop alternative to Bill.com-style dunning, built for solo founders, freelancers, small agencies, and bookkeepers who already use QuickBooks or Wave plus Gmail plus Slack.
+
+**Contents:** [How it works](#how-it-works) · [Slack commands](#slack-commands) · [Install](#install) · [Config](#config) · [How it compares](#how-it-compares) · [Guardrails](#guardrails-against-spamming-your-clients) · [FAQ](#faq)
 
 ## How it works
 
-```
-QuickBooks (overdue + unpaid) ─┐
-                                ├─→ planner → tiered draft → Slack batch → you approve → Gmail send
-Gmail sent-history (dedupe)   ─┘                                       (resolve = invoice marked paid)
-```
+1. **Find.** Once a day (or on demand) PayUp queries QuickBooks or Wave for invoices that are overdue *and* still unpaid, and posts the batch to your `#payup` Slack channel. Nothing is sent.
+2. **Approve.** You reply in plain language: `send 1 and 3`, `skip Delta`, or `draft all`. Tone escalates by age and history: gentle, then firm, then final.
+3. **Send or draft.** `send` emails the reminder from your Gmail; `draft` drops it in your Gmail Drafts so you can edit and send it yourself. When the invoice is marked paid, it disappears from the next batch.
 
-- **QuickBooks** says who is overdue and still unpaid (Balance > 0, past due). A paid invoice drops out of the query, so chasing resolves itself. This is authoritative, not a guess from a reply that says "paid". Swappable: `PAYUP_SOURCE=wave` uses Wave instead.
-- **Gmail sent-history** is the memory: a search keyed on the invoice number gives the prior-reminder count (for escalation) and the last-sent date (so we never re-nag inside `min_gap_days`).
-- **Templates** produce the draft with no API key and no cost. (A Claude-polished wording step is planned for v1.1; today the deterministic templates are used as-is.)
+You can read the exact reminder copy before anything goes out. The shipped tone is restrained on purpose:
 
-## What runs automatically (and what does not)
-
-The bot runs a daily timer on its always-on host. When it fires it **prepares and posts** the overdue batch to Slack, then stops. It does **not** send anything on its own.
-
-| Automatic (no input from you) | Your call, every time |
-|---|---|
-| detect overdue-and-unpaid invoices in QuickBooks | approving a send |
-| pick the tier (gentle / firm / final) | |
-| draft the reminder | |
-| skip anything chased inside `min_gap_days` | |
-| drop invoices that get marked paid | |
-| post the batch to Slack on schedule | |
-
-So "runs on a schedule" means it does all the busywork daily and hands you a ready-to-approve batch. The actual Gmail send always waits for you to say `send all` or `send 1 and 3`. Nothing reaches a client unsupervised.
-
-> The scheduler calls `refresh` (post the batch), never `execute` (send). See [bot/scheduler.py](bot/scheduler.py).
-
-## What it will never do
-
-No payment rails. No moving money. No collections or legal escalation. The "final" tier is firm but never threatens. It chases; it never pays. These are enforced by tests, not just intentions.
-
-## Quick start
-
-### 1. Install (Claude Code plugin, for setup)
-Add the repo as a local marketplace and install the `payup` plugin, then run `/payup-setup`. It walks you through everything below.
-
-### 2. Wire the secrets
-Copy `.env.example` to `.env` and fill in:
-
-| Secret | Where it comes from |
-|---|---|
-| `QBO_ACCESS_TOKEN`, `QBO_REALM_ID` | https://developer.intuit.com (free sandbox company + OAuth Playground token) |
-| Gmail OAuth (`config/token.json`) | run `python engine/scripts/gmail_oauth_setup.py` once |
-| `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` | https://api.slack.com/apps (enable Socket Mode) |
-| `QBO_REFRESH_TOKEN` + `QBO_CLIENT_ID` + `QBO_CLIENT_SECRET` *(for always-on)* | so the bot renews the hourly QBO access token itself |
-
-> Using Wave instead (US/Canada only)? Set `PAYUP_SOURCE=wave` and provide `WAVE_API_TOKEN` + `WAVE_BUSINESS_ID`.
+> *Gentle:* "Just a friendly heads up that invoice #1042 was due on the 13th and looks still open on our side. It may have slipped through."
 >
-> `ANTHROPIC_API_KEY` is reserved for a planned v1.1 draft-polish step and has no effect yet.
-
-### 3. Preview without sending
-```bash
-PYTHONPATH=engine python3 -m payup.cli plan-chase \
-  --invoices fixtures-sandbox/demo_business.json --now "$(date +%F)"
-```
-
-### 4. Run the bot
-```bash
-pip install -e '.[bot]'
-PAYUP_LIVE=0 python3 -m bot.app     # dry-run: drafts but never sends
-```
-Set `PAYUP_LIVE=1` when the dry-run batch looks right.
-
-## Deploy (always-on)
-
-The bot needs to stay running so its daily timer ticks even when your laptop is off. Socket Mode means **no public URL and no inbound ports**, so any always-on host works.
-
-**Fly.io (recommended):**
-```bash
-fly launch --no-deploy            # rename the app in fly.toml
-fly secrets set QBO_ACCESS_TOKEN=... QBO_REALM_ID=... \
-                QBO_REFRESH_TOKEN=... QBO_CLIENT_ID=... QBO_CLIENT_SECRET=... \
-                SLACK_BOT_TOKEN=xoxb-... SLACK_APP_TOKEN=xapp-... \
-                PAYUP_LIVE=1
-fly deploy
-```
-Railway, Render, a small VPS, or any machine that stays on will work the same way (`docker build` + run with the env vars).
-
-> QuickBooks access tokens expire hourly. For an always-on bot, set `QBO_REFRESH_TOKEN` + `QBO_CLIENT_ID` + `QBO_CLIENT_SECRET` so PayUp renews the token before each daily run; otherwise it works only until the first token expires. Set `PAYUP_QBO_ENV=production` to point at your real company (the default is the Intuit sandbox).
+> *Final:* "This is a final reminder that invoice #1042 remains unpaid. Please arrange payment, or reply with a firm date so we can close this out."
 
 ## Slack commands
 
-| You say | PayUp does |
+| You type (`@PayUp ...`) | What happens |
 |---|---|
-| `show overdue` | rebuild and post the current batch |
-| `send all` | send every reminder in the batch |
-| `send 1 and 3` | send specific rows |
-| `draft all` | save every reminder as a Gmail draft (sends nothing) |
-| `draft 1 and 3` | save specific rows as Gmail drafts |
-| `skip Delta` | drop a row (sends nothing) |
-| `help` | list commands |
+| `show overdue` | posts the current overdue batch (sends nothing) |
+| `send all` / `send 1 and 3` | emails those reminders after your approval |
+| `draft all` / `draft 2` | saves those reminders as Gmail drafts to edit and send yourself |
+| `skip Delta` | drops a row from this batch |
+| `help` | lists the commands |
 
-Anything ambiguous is treated as "do nothing" and PayUp asks you to clarify. It never sends on a guess.
+Anything ambiguous (a question, a negation, an unclear target) is treated as "do nothing" and PayUp asks you to clarify. It never sends on a guess.
 
-### Draft vs send
+## Install
 
-`draft` saves the reminder into your Gmail Drafts folder instead of sending it. Use it when you want to tweak the wording, add a line, or eyeball the message in Gmail before it goes out. Open Gmail, review or edit the draft, and hit send yourself.
+PayUp is set up once inside Claude Code, then operated from Slack.
 
-A draft is **not** a chase. PayUp only counts an invoice as chased once a reminder actually lands in your Sent mail (the dedupe key is the invoice number in the subject of a sent message). So a drafted invoice still shows up in the next batch until you send it. `draft` gets the same guards as `send`: a question or a negation ("should I draft these?", "do not draft all") is treated as "do nothing".
-
-### Customizing templates
-
-The reminder wording lives in [config/templates.yml](config/templates.yml), one `subject` plus `body` block per tier (gentle, firm, final). Edit it to match your voice; anything you leave out keeps the built-in default. Available placeholders:
-
-```
-{customer_name}  {invoice_number}  {amount}  {due_date}  {sender_name}  {business_name}
+```bash
+pip install -e '.[bot]'
 ```
 
-Two rules are enforced at render time on every draft, including your custom copy:
+Then add the repo as a local plugin marketplace in Claude Code and run **`/payup-setup`**. It walks you through the three connections below. You need a QuickBooks (or Wave) token, a Gmail OAuth consent, and a Slack app.
 
-- the **subject must contain `{invoice_number}`** (it is the Gmail dedupe key), and
-- no legal / collections / threat language and **no em dashes**.
+<details>
+<summary>QuickBooks (default source)</summary>
 
-Break either and PayUp refuses to render that draft rather than send something off-key. Point at a different file with `PAYUP_TEMPLATES_CONFIG`.
+Create a free developer account and a sandbox company at [developer.intuit.com](https://developer.intuit.com), mint an access token from the OAuth Playground (scope `com.intuit.quickbooks.accounting`), and put `QBO_ACCESS_TOKEN` + `QBO_REALM_ID` in `.env`. Keep `PAYUP_SOURCE=quickbooks`. For an always-on bot, also set `QBO_REFRESH_TOKEN` + `QBO_CLIENT_ID` + `QBO_CLIENT_SECRET` so PayUp renews the hourly token itself. Set `PAYUP_QBO_ENV=production` only when you point it at a real company.
+</details>
 
-> Draft support added the `gmail.compose` scope. If you set PayUp up before drafts existed, delete `config/token.json` and re-run `python engine/scripts/gmail_oauth_setup.py` to re-consent.
+<details>
+<summary>Wave (US/Canada alternative)</summary>
+
+Set `PAYUP_SOURCE=wave` and provide a full-access GraphQL `WAVE_API_TOKEN` + `WAVE_BUSINESS_ID`.
+</details>
+
+<details>
+<summary>Gmail (the only outbound send)</summary>
+
+Create an OAuth client (Desktop app) in Google Cloud Console, save the JSON to `config/oauth_client.json`, and run `python engine/scripts/gmail_oauth_setup.py` once. PayUp requests three Gmail scopes only: `send`, `readonly` (to dedupe against your Sent mail), and `compose` (to save drafts). No full-mailbox access.
+</details>
+
+<details>
+<summary>Slack (Socket Mode, no public URL)</summary>
+
+Create an app at [api.slack.com/apps](https://api.slack.com/apps), enable Socket Mode, add bot scopes `chat:write` + `app_mentions:read` + `channels:history`, install it, invite it to your channel, and put `SLACK_BOT_TOKEN` (xoxb) + `SLACK_APP_TOKEN` (xapp) in `.env`.
+</details>
+
+```bash
+PAYUP_LIVE=0 python -m bot.app     # dry-run: drafts but never sends
+```
+
+Flip `PAYUP_LIVE=1` when the dry-run batch looks right. For always-on hosting, see the Fly.io guide further down.
+
+## Config
+
+Copy `.env.example` to `.env` and fill it in. The knobs you will actually touch:
+
+| Variable | What it does | Default |
+|---|---|---|
+| `PAYUP_SOURCE` | `quickbooks` or `wave` | `quickbooks` |
+| `PAYUP_LIVE` | `1` to send for real, `0` for dry-run | `0` |
+| `PAYUP_MIN_GAP_DAYS` | never re-chase the same invoice within this many days | `7` |
+| `PAYUP_TEMPLATES_CONFIG` | path to your custom reminder templates | `config/templates.yml` |
+
+Reminder copy is yours to edit: change the gentle/firm/final templates in `config/templates.yml`. The guardrails still apply to your custom copy (see below).
+
+## How it compares
+
+|  | **PayUp** | Chaser / Upflow | Bill.com | QuickBooks reminders | Manual |
+|---|:---:|:---:|:---:|:---:|:---:|
+| You approve every send | ✓ | ✗ | ✗ | ✗ | ✓ |
+| Never moves money (read-only) | ✓ | partial | ✗ | partial | ✓ |
+| Cost | ~$0 (MIT) | $$/mo | $$/mo | bundled | free |
+| Runs in your stack (Slack + Gmail) | ✓ | ✗ | ✗ | ✗ | ✓ |
+| No new database | ✓ | ✗ | ✗ | ✗ | ✓ |
+| Anti-spam gap + dedupe + resolve-on-paid | ✓ | partial | partial | ✗ | ✗ |
+| Save drafts you edit before sending | ✓ | ✗ | ✗ | ✗ | ✓ |
+| Collections language blocked by design | ✓ | ✗ | ✗ | n/a | n/a |
+
+PayUp wins every control-and-ownership row and deliberately concedes the "fully automated, do it all for me" rows. That trade is the point.
+
+## Guardrails against spamming your clients
+
+These are enforced by tests, not just promised in docs:
+
+- **Human-in-the-loop.** Nothing sends without an explicit `send` command. The daily timer only posts the batch.
+- **Never moves money.** The engine only reads from the accounting source. There are no payment, transfer, or refund code paths.
+- **No-nag gap.** An invoice chased in the last `min_gap_days` (default 7) is held out of the batch.
+- **Dedupe from your Sent mail.** PayUp counts prior reminders by searching your Gmail Sent for the invoice number, so it cannot double-count or re-nag, even across restarts.
+- **Resolve-on-paid.** A paid invoice drops out of the overdue query automatically. No manual cleanup.
+- **Final tier never threatens.** Legal and collections language is blacklisted and blocked at render time, including in your custom templates.
+
+## What it will never do
+
+No payment rails. No moving money. No collections or legal escalation. No sending on a schedule you cannot see. The "final" tier is firm but never a threat. PayUp chases; it never pays, and it never sends without you.
+
+## Architecture
+
+State-light by design: there is no database. Your accounting tool and your Gmail Sent history are the source of truth, so PayUp has nothing to keep in sync.
+
+<div align="center">
+<img src="docs/assets/architecture.svg" alt="QuickBooks or Wave, read-only, into PayUp, into Slack approval, into Gmail send or draft" width="820" />
+</div>
+
+The invoice source is pluggable: every connector returns the same `Invoice` shape, so adding Xero or Stripe is one new connector file, not a new bot. See [CLAUDE.md](CLAUDE.md) for the contributor contract and the full invariant list.
+
+## Deploy (always-on)
+
+Socket Mode means no public URL and no inbound ports, so any always-on host works.
+
+```bash
+fly launch --no-deploy
+fly secrets set QBO_ACCESS_TOKEN=... QBO_REALM_ID=... QBO_REFRESH_TOKEN=... \
+                QBO_CLIENT_ID=... QBO_CLIENT_SECRET=... \
+                SLACK_BOT_TOKEN=xoxb-... SLACK_APP_TOKEN=xapp-... PAYUP_LIVE=1
+fly deploy
+```
+
+Railway, Render, a small VPS, or any machine that stays on works the same way.
+
+## FAQ
+
+### Does PayUp send invoice reminders automatically without approval?
+
+PayUp never sends a reminder without explicit human approval in Slack. Every daily batch is posted for review, and nothing reaches a client until you reply with a command like `send all` or `send 1 and 3`. The scheduler only posts the batch; the send step always waits for a human.
+
+### How is PayUp different from Bill.com?
+
+PayUp is a human-in-the-loop alternative to Bill.com-style dunning. It drafts the chase and lets you approve each send, using tools you already pay for (QuickBooks, Gmail, Slack), while Bill.com auto-fires reminders and layers in payment processing. PayUp is read-only on accounting data and has no payment rails by design.
+
+### What accounting platforms does PayUp support?
+
+PayUp defaults to QuickBooks Online and also supports Wave for US and Canada businesses via `PAYUP_SOURCE=wave`. Both connectors expose the same invoice model, so switching sources is a config change, and adding a new provider like Xero is one connector file.
+
+### How does PayUp avoid nagging clients repeatedly?
+
+PayUp searches your Gmail Sent mail keyed on the invoice number to count prior reminders and enforce a configurable no-nag gap, and it automatically drops any invoice the accounting source marks as paid. Chasing resolves itself with no manual removal step.
+
+### Is PayUp safe to use with real client data?
+
+PayUp's guardrails are enforced by tests: no money-movement code paths exist, the final reminder tier is blocked from legal or collections language, and no secrets or PII are committed to the repo. It is MIT-licensed and the full source is public.
 
 ## Development
 
 ```bash
 pip install -e '.[dev]'
 ruff check engine bot
-pytest                 # fully mocked, runs in well under 2 seconds
+pytest          # fully mocked, runs in well under 2 seconds
 ```
 
-Architecture and conventions: see [CLAUDE.md](CLAUDE.md).
+Architecture and the non-negotiable invariants are documented in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md).
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Contributing
+
+Issues and pull requests welcome. New behavior ships with tests, and the guardrail suite must stay green.
