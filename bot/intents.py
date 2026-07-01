@@ -19,6 +19,11 @@ _DRAFT_VERBS = ("draft",)
 _SHOW_WORDS = ("show overdue", "show", "overdue", "list", "what's overdue", "whats overdue", "status")
 _HELP_WORDS = ("help", "commands", "?", "how do i")
 
+# Reminder-copy editing: "edit template gentle subject: <new copy>".
+_TIERS = ("gentle", "firm", "final")
+_TEMPLATE_FIELDS = ("subject", "body")
+_EDIT_TEMPLATE_RE = re.compile(r"edit\s+templates?\b(.*)", re.IGNORECASE | re.DOTALL)
+
 # Slack markup like <@U123>, <#C123|name>, <https://...> is stripped before
 # parsing, so an @mention prefix does not leak ids/digits into matching.
 _MARKUP_RE = re.compile(r"<[^>]+>")
@@ -45,9 +50,14 @@ _NAME_STOPWORDS = frozenset(
 
 @dataclass(frozen=True)
 class Intent:
-    kind: str  # 'send' | 'draft' | 'skip' | 'show_overdue' | 'help' | 'unknown'
+    kind: str  # 'send' | 'draft' | 'skip' | 'show_overdue' | 'help' | 'edit_template' | 'unknown'
     ids: tuple[int, ...] = field(default=())  # 1-based row numbers
     all: bool = False
+    # For kind == 'edit_template': which tier/field to rewrite and the new copy.
+    # All None means "no target given" -> show current copy + usage.
+    tier: str | None = None
+    template_field: str | None = None
+    template_text: str | None = None
 
 
 def _resolve_names(text: str, batch: list[dict]) -> set[int]:
@@ -70,13 +80,47 @@ def _resolve_numbers(text: str, batch: list[dict]) -> set[int]:
     return {int(m) for m in _NUM_RE.findall(text) if int(m) in valid}
 
 
+def _parse_edit_template(raw: str):
+    """Pull (tier, field, text) out of 'edit template gentle subject: <copy>'.
+
+    Reads the original-case text so the new copy keeps the user's capitalization,
+    and splits on the FIRST colon so a colon inside the copy (e.g. "Reminder:
+    ...") is preserved. Returns None when there is no clear tier + field + copy,
+    so the handler shows the current copy and usage instead of guessing."""
+    m = _EDIT_TEMPLATE_RE.search(raw)
+    if not m or ":" not in m.group(1):
+        return None
+    head, body = m.group(1).split(":", 1)
+    body = body.strip()
+    tier = fld = None
+    for tok in head.lower().split():
+        if tok in _TIERS:
+            tier = tok
+        elif tok in _TEMPLATE_FIELDS:
+            fld = tok
+    if tier and fld and body:
+        return (tier, fld, body)
+    return None
+
+
 def parse_intent(text: str, batch: list[dict] | None = None) -> Intent:
     """Parse a Slack message into an Intent. `batch` rows are dicts with at least
     {'n': int, 'customer': str} so names like "Delta" resolve to a row number."""
     batch = batch or []
-    t = _MARKUP_RE.sub(" ", (text or "")).strip().lower()
+    raw = _MARKUP_RE.sub(" ", (text or "")).strip()
+    t = raw.lower()
     if not t:
         return Intent("unknown")
+
+    # Editing reminder copy is a distinct command, matched BEFORE the action-verb
+    # logic so template body text (which may contain "send", "all", numbers, or a
+    # customer name) is never misread as a send/skip/draft.
+    if "edit template" in t:
+        parsed = _parse_edit_template(raw)
+        if parsed:
+            tier, fld, body = parsed
+            return Intent("edit_template", tier=tier, template_field=fld, template_text=body)
+        return Intent("edit_template")
 
     has_send = any(t.startswith(v) or f" {v} " in f" {t} " for v in _SEND_VERBS)
     has_skip = any(t.startswith(v) or f" {v} " in f" {t} " for v in _SKIP_VERBS)

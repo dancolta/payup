@@ -27,6 +27,7 @@ HELP_TEXT = (
     '  "send 1 and 3"   send specific rows\n'
     '  "draft all"      save reminders as Gmail drafts to review (nothing is sent)\n'
     '  "skip Delta"     drop a row from this batch (nothing is sent)\n'
+    '  "edit template"  change the reminder wording in your own voice (nothing is sent)\n'
     "Nothing is ever sent until you say send."
 )
 
@@ -159,6 +160,111 @@ class ChaseSession:
         self._plans[channel] = plan
         return output.render_batch(plan, now=self.deps.now())
 
+    def _edit_template(self, intent) -> str:
+        """Change the reminder wording from Slack. Editing copy is not a send: it
+        only rewrites stored templates, and every future draft still passes the
+        render-time guardrails and still needs explicit approval to go out. So
+        there is no HITL gate here, but a bad edit is rejected before it is saved."""
+        from dataclasses import replace
+
+        from payup.lib.escalation import Tier
+        from payup.lib.models import Invoice
+        from payup.lib.templating import (
+            TemplateSet,
+            TemplatingConfig,
+            TemplatingError,
+            render_email,
+        )
+
+        tmpl_cfg: TemplatingConfig = self.deps.cfg.templating
+        current: TemplateSet = tmpl_cfg.templates or TemplateSet()
+
+        # No tier/field given: show the current copy and how to change it.
+        if not (intent.tier and intent.template_field and intent.template_text):
+            lines = ["Current reminder copy. Edit one field at a time:"]
+            for tier in ("gentle", "firm", "final"):
+                lines.append(f"\n{tier}")
+                lines.append(f"  subject: {current.subject_for(tier)}")
+                lines.append(f"  body: {current.body_for(tier)}")
+            lines.append(
+                '\nTo change a field, send e.g. "edit template gentle subject: '
+                'Quick nudge on invoice #{invoice_number}". Placeholders: '
+                "{customer_name} {invoice_number} {amount} {due_date} {sender_name} "
+                "{business_name}. Rules: keep {invoice_number} in the subject; no "
+                "legal/collections wording; no em dashes. Nothing is ever sent."
+            )
+            return "\n".join(lines)
+
+        tier, fld, text = intent.tier, intent.template_field, intent.template_text
+        candidate = replace(current, **{f"{tier}_{fld}": text})
+
+        # Validate against the SAME render-time guardrails the bot enforces on every
+        # draft, using a synthetic invoice. Reject before saving so a broken template
+        # can never reach a real chase (or wedge the batch build).
+        sample = Invoice(
+            invoice_id="EDIT",
+            invoice_number="1042",
+            customer_name="Sample Customer",
+            customer_email="sample@example.com",
+            amount_due_cents=125000,
+            currency="USD",
+            due_date=date(2026, 1, 1),
+            status="SENT",
+        )
+        trial = TemplatingConfig(
+            sender_name=tmpl_cfg.sender_name,
+            business_name=tmpl_cfg.business_name,
+            templates=candidate,
+        )
+        try:
+            render_email(sample, Tier(tier), trial)
+        except TemplatingError as exc:
+            return (
+                f"Did not save the {tier} {fld}: {exc}. Nothing changed. Keep "
+                "{invoice_number} in the subject, and avoid legal/collections "
+                "wording and em dashes."
+            )
+
+        # Persist so the change survives a restart, then hot-swap the in-memory
+        # config so the very next "show overdue" renders with the new copy.
+        saved = self._persist_template(tier, fld, text)
+        self.deps.cfg = replace(
+            self.deps.cfg, templating=replace(tmpl_cfg, templates=candidate)
+        )
+        tail = "" if saved else " (in memory only: the templates file was not writable)"
+        return (
+            f'Updated the {tier} {fld}. It passed the guardrails and is live now. Say '
+            f'"show overdue" to see it in the next batch. Nothing was sent.{tail}'
+        )
+
+    def _persist_template(self, tier: str, field_name: str, text: str) -> bool:
+        """Merge one edited field into the templates YAML file, creating it if
+        needed. Returns True on write. Best-effort: if pyyaml is missing or the
+        path is unwritable, the in-memory edit still applies for this process."""
+        import os
+
+        path = os.environ.get("PAYUP_TEMPLATES_CONFIG", "config/templates.yml")
+        try:
+            import yaml
+        except Exception:
+            return False
+        data: dict = {}
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    data = yaml.safe_load(fh) or {}
+            except Exception:
+                data = {}
+        data.setdefault(tier, {})[field_name] = text
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                yaml.safe_dump(
+                    data, fh, default_flow_style=False, sort_keys=False, allow_unicode=True
+                )
+            return True
+        except Exception:
+            return False
+
     def handle(self, channel: str, text: str, *, event_id: str | None = None) -> str | None:
         # Dedupe Slack's double delivery of @mentions (app_mention + message).
         # Returns None for a duplicate so the caller posts nothing.
@@ -174,6 +280,8 @@ class ChaseSession:
             return HELP_TEXT
         if intent.kind == "show_overdue":
             return self.refresh(channel)
+        if intent.kind == "edit_template":
+            return self._edit_template(intent)
         if intent.kind == "unknown":
             return CLARIFY_TEXT
         if intent.kind == "skip":

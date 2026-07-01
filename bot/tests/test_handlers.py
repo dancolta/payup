@@ -221,3 +221,57 @@ def test_refresh_reports_source_error_instead_of_silence(session, monkeypatch):
     out = session.refresh(CH)
     assert "could not reach" in out.lower()
     assert session._gmail.sent == []
+
+
+@pytest.fixture
+def edit_session(monkeypatch, tmp_path):
+    # A session whose template edits write to a temp file (never the repo config).
+    monkeypatch.setenv("PAYUP_TEMPLATES_CONFIG", str(tmp_path / "templates.yml"))
+    deps = BotDeps(token="t", business_id="B", now_fn=lambda: NOW)
+    return ChaseSession(deps)
+
+
+def test_edit_template_shows_current_copy_when_no_target(edit_session):
+    out = edit_session.handle(CH, "edit template")
+    assert "gentle" in out and "firm" in out and "final" in out
+    assert "{invoice_number}" in out  # usage mentions the required placeholder
+
+
+def test_edit_template_applies_and_persists(edit_session, monkeypatch, tmp_path):
+    out = edit_session.handle(
+        CH, "edit template gentle subject: Quick nudge on invoice #{invoice_number}"
+    )
+    assert "Updated the gentle subject" in out and "Nothing was sent" in out
+    # Live in memory for the next batch.
+    ts = edit_session.deps.cfg.templating.templates
+    assert ts.gentle_subject == "Quick nudge on invoice #{invoice_number}"
+    # Persisted to the file so it survives a restart.
+    import yaml
+
+    saved = yaml.safe_load((tmp_path / "templates.yml").read_text(encoding="utf-8"))
+    assert saved["gentle"]["subject"] == "Quick nudge on invoice #{invoice_number}"
+
+
+def test_edit_template_rejects_subject_without_invoice_number(edit_session, tmp_path):
+    out = edit_session.handle(CH, "edit template gentle subject: A friendly reminder")
+    assert "Did not save" in out
+    # Nothing changed: config untouched (still the default None), no file written.
+    assert edit_session.deps.cfg.templating.templates is None
+    assert not (tmp_path / "templates.yml").exists()
+
+
+def test_edit_template_rejects_collections_language(edit_session):
+    out = edit_session.handle(
+        CH, "edit template final body: Pay now or we call a collection agency about #{invoice_number}."
+    )
+    assert "Did not save" in out
+    assert edit_session.deps.cfg.templating.templates is None
+
+
+def test_edit_template_never_sends(edit_session):
+    # Editing copy is not a send under any phrasing.
+    edit_session.handle(CH, "edit template firm body: send this reminder for #{invoice_number}")
+    # No gmail transport is configured; the fact that nothing raised and no send
+    # path ran is the guarantee. Re-editing still reports the no-send contract.
+    out = edit_session.handle(CH, "edit template")
+    assert "Nothing is ever sent" in out

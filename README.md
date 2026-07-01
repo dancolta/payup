@@ -40,6 +40,8 @@ You can read the exact reminder copy before anything goes out. The shipped tone 
 | `send all` / `send 1 and 3` | emails those reminders after your approval |
 | `draft all` / `draft 2` | saves those reminders as Gmail drafts to edit and send yourself |
 | `skip Delta` | drops a row from this batch |
+| `edit template` | shows the current reminder copy and how to change it (sends nothing) |
+| `edit template gentle subject: ...` | rewrites a tier's `subject` or `body` in your words; validated before it saves |
 | `help` | lists the commands |
 
 Anything ambiguous (a question, a negation, an unclear target) is treated as "do nothing" and PayUp asks you to clarify. It never sends on a guess.
@@ -97,7 +99,9 @@ Copy `.env.example` to `.env` and fill it in. The knobs you will actually touch:
 
 ### Edit the reminder wording in your own voice
 
-Run **`/payup-edit-template`** in Claude Code: describe the tone you want (or paste a message you have already written) and PayUp rewrites the gentle/firm/final copy to sound like you, then checks it against the guardrails before saving. Prefer to hand-edit? Change the templates in `config/templates.yml` directly, then run:
+From Slack, edit one field at a time: `@PayUp edit template` shows the current copy, and `@PayUp edit template gentle subject: Quick nudge on invoice #{invoice_number}` rewrites a tier's subject or body. Every edit is checked against the guardrails and takes effect on the next `show overdue`; nothing is sent.
+
+Want the whole thing rewritten to sound like you? Run **`/payup-edit-template`** in Claude Code: describe the tone you want (or paste a message you have already written) and PayUp rewrites the gentle/firm/final copy, then checks it against the guardrails before saving. Prefer to hand-edit? Change the templates in `config/templates.yml` directly, then run:
 
 ```bash
 python -m payup.cli validate-templates
