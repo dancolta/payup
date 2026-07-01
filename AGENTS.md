@@ -23,6 +23,9 @@ claude plugin validate .       # plugin manifest gate (local)
 PYTHONPATH=engine python3 -m payup.cli plan-chase \
   --invoices fixtures-sandbox/demo_business.json --now "$(date +%F)"
 
+# Check custom reminder copy against the guardrails (pure, offline, sends nothing):
+PYTHONPATH=engine python3 -m payup.cli validate-templates
+
 # Run the Slack bot locally (needs the [bot] extra + env secrets):
 pip install -e '.[bot]'
 PAYUP_LIVE=0 python -m bot.app   # dry-run: drafts but never sends

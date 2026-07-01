@@ -95,6 +95,60 @@ def _cmd_send(args) -> int:
     return 0
 
 
+def _cmd_validate_templates(args) -> int:
+    """Render every tier against a synthetic invoice so the same render-time
+    guardrails the bot enforces (subject carries the invoice number, no
+    legal/collections language, no em dashes) are checked here. Pure and offline:
+    no accounting source, no Gmail, no token, nothing sent."""
+    from .lib.escalation import Tier
+    from .lib.templating import (
+        TemplateSet,
+        TemplatingConfig,
+        TemplatingError,
+        render_email,
+    )
+
+    path = args.templates or os.environ.get("PAYUP_TEMPLATES_CONFIG", "config/templates.yml")
+    if not os.path.exists(path):
+        print(f"No templates file at {path}; the built-in defaults are always safe.")
+        return 0
+
+    cfg = TemplatingConfig(
+        sender_name="Your Name",
+        business_name="Your Business",
+        templates=TemplateSet.load(path),
+    )
+    sample = Invoice(
+        invoice_id="VALIDATE",
+        invoice_number="1042",
+        customer_name="Sample Customer",
+        customer_email="sample@example.com",
+        amount_due_cents=125000,
+        currency="USD",
+        due_date=date(2026, 1, 1),
+        status="SENT",
+    )
+
+    ok = True
+    for tier in (Tier.GENTLE, Tier.FIRM, Tier.FINAL):
+        try:
+            render_email(sample, tier, cfg)
+            print(f"  {tier.value}: OK")
+        except TemplatingError as exc:
+            ok = False
+            print(f"  {tier.value}: FAIL - {exc}", file=sys.stderr)
+
+    if ok:
+        print(f"All template tiers pass the guardrails ({path}).")
+        return 0
+    print(
+        "Fix config/templates.yml before running the bot: the subject must contain "
+        "{invoice_number}, and no legal/collections language or em dashes are allowed.",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def _cmd_status(args) -> int:
     # Resolve the ledger path at call time so PAYUP_LEDGER is honored even when
     # set after import (and so the bot and CLI agree on where runs are recorded).
@@ -120,6 +174,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_send = sub.add_parser("send", help="Send approved reminders. Refuses without --approved-ids.")
     p_send.add_argument("--approved-ids", nargs="*", default=[], help="Invoice ids approved to send.")
     p_send.set_defaults(func=_cmd_send)
+
+    p_validate = sub.add_parser(
+        "validate-templates",
+        help="Check config/templates.yml against the guardrails (renders nothing to anyone).",
+    )
+    p_validate.add_argument(
+        "--templates", help="Path to templates.yml (default config/templates.yml or PAYUP_TEMPLATES_CONFIG)."
+    )
+    p_validate.set_defaults(func=_cmd_validate_templates)
 
     p_status = sub.add_parser("status", help="Show recent runs from the local ledger.")
     p_status.add_argument("--limit", type=int, default=20)

@@ -49,3 +49,35 @@ def test_load_templates_from_yaml(monkeypatch, tmp_path):
 def test_load_templates_defaults_when_unset(monkeypatch):
     monkeypatch.setenv("PAYUP_TEMPLATES_CONFIG", "/nonexistent/templates.yml")
     assert app._load_templates() == TemplateSet()
+
+
+def test_gmail_token_source_prefers_local_file(tmp_path):
+    # When the token file exists, it wins (unchanged behaviour) and no JSON is parsed.
+    token = tmp_path / "token.json"
+    token.write_text("{}", encoding="utf-8")
+    env = {"GMAIL_TOKEN_PATH": str(token), "GMAIL_TOKEN_JSON": '{"never":"used"}'}
+    kind, value = app._gmail_token_source(env)
+    assert kind == "file"
+    assert value == str(token)
+
+
+def test_gmail_token_source_falls_back_to_json_blob(tmp_path):
+    # No file present, but the GMAIL_TOKEN_JSON secret carries the same token
+    # (the Fly/cloud path). Returns the parsed dict; no google libs required.
+    missing = tmp_path / "absent.json"
+    env = {
+        "GMAIL_TOKEN_PATH": str(missing),
+        "GMAIL_TOKEN_JSON": '{"refresh_token": "x", "scopes": ["a"]}',
+    }
+    kind, value = app._gmail_token_source(env)
+    assert kind == "info"
+    assert value == {"refresh_token": "x", "scopes": ["a"]}
+
+
+def test_gmail_token_source_errors_when_neither_present(tmp_path):
+    import pytest
+
+    env = {"GMAIL_TOKEN_PATH": str(tmp_path / "absent.json")}
+    with pytest.raises(SystemExit) as exc:
+        app._gmail_token_source(env)
+    assert "GMAIL_TOKEN_JSON" in str(exc.value)

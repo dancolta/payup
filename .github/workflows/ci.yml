@@ -26,3 +26,6 @@ jobs:
 
       - name: Guardrail suite (explicit gate)
         run: pytest engine/tests/test_guardrails.py engine/tests/test_no_secrets_committed.py engine/tests/test_no_em_dashes.py -v
+
+      - name: Validate plugin manifest + skills
+        run: python engine/scripts/validate_plugin.py

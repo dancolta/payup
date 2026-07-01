@@ -95,7 +95,15 @@ Copy `.env.example` to `.env` and fill it in. The knobs you will actually touch:
 | `PAYUP_MIN_GAP_DAYS` | never re-chase the same invoice within this many days | `7` |
 | `PAYUP_TEMPLATES_CONFIG` | path to your custom reminder templates | `config/templates.yml` |
 
-Reminder copy is yours to edit: change the gentle/firm/final templates in `config/templates.yml`. The guardrails still apply to your custom copy (see below).
+### Edit the reminder wording in your own voice
+
+Run **`/payup-edit-template`** in Claude Code: describe the tone you want (or paste a message you have already written) and PayUp rewrites the gentle/firm/final copy to sound like you, then checks it against the guardrails before saving. Prefer to hand-edit? Change the templates in `config/templates.yml` directly, then run:
+
+```bash
+python -m payup.cli validate-templates
+```
+
+to confirm your copy still passes (subject keeps `{invoice_number}`, no collections language, no em dashes) before the bot loads it. The guardrails apply to your custom copy either way (see below).
 
 ## How it compares
 
@@ -145,11 +153,14 @@ Socket Mode means no public URL and no inbound ports, so any always-on host work
 fly launch --no-deploy
 fly secrets set QBO_ACCESS_TOKEN=... QBO_REALM_ID=... QBO_REFRESH_TOKEN=... \
                 QBO_CLIENT_ID=... QBO_CLIENT_SECRET=... \
-                SLACK_BOT_TOKEN=xoxb-... SLACK_APP_TOKEN=xapp-... PAYUP_LIVE=1
+                SLACK_BOT_TOKEN=xoxb-... SLACK_APP_TOKEN=xapp-... PAYUP_LIVE=1 \
+                GMAIL_TOKEN_JSON="$(cat config/token.json)"
 fly deploy
 ```
 
-Railway, Render, a small VPS, or any machine that stays on works the same way.
+Your Gmail token lives in `config/token.json`, which is deliberately not baked into the image (it is gitignored and dockerignored). Pass its contents as the `GMAIL_TOKEN_JSON` secret: PayUp loads Gmail credentials from `config/token.json` when the file exists (local runs) and from `GMAIL_TOKEN_JSON` otherwise (cloud). Run `/payup-setup` first so there is a `config/token.json` to copy from.
+
+Railway, Render, a small VPS, or any machine that stays on works the same way. On a host where you can place `config/token.json` on disk, you can skip `GMAIL_TOKEN_JSON`.
 
 ## FAQ
 

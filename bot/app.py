@@ -9,6 +9,7 @@ package (and the test suite) never needs them installed.
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 from datetime import date
@@ -31,22 +32,44 @@ def _require(name: str, hint: str = "") -> str:
     return val
 
 
+GMAIL_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.compose",
+]
+
+
+def _gmail_token_source(environ: dict | None = None):
+    """Decide where the Gmail OAuth token comes from, without importing google
+    libs (so it is unit-testable and the engine/tests stay dependency-light).
+
+    Order, and it never changes existing behaviour: a local token file wins if it
+    exists (the default `config/token.json` written by gmail_oauth_setup.py). When
+    no file is present (e.g. a container where mounting a file is awkward) it falls
+    back to the same token JSON supplied inline via the GMAIL_TOKEN_JSON secret.
+    Returns ('file', path) or ('info', dict); raises SystemExit if neither is set."""
+    environ = os.environ if environ is None else environ
+    token_path = environ.get("GMAIL_TOKEN_PATH", "config/token.json")
+    if os.path.exists(token_path):
+        return ("file", token_path)
+    blob = environ.get("GMAIL_TOKEN_JSON")
+    if blob:
+        return ("info", json.loads(blob))
+    raise SystemExit(
+        f"Gmail token not found at {token_path} and GMAIL_TOKEN_JSON is unset. "
+        "Local: run python engine/scripts/gmail_oauth_setup.py. "
+        "Cloud (Fly/Render/etc.): set the GMAIL_TOKEN_JSON secret to the contents "
+        "of config/token.json."
+    )
+
+
 def _load_gmail_creds():  # pragma: no cover - requires google libs + a real token
     from google.oauth2.credentials import Credentials
 
-    token_path = os.environ.get("GMAIL_TOKEN_PATH", "config/token.json")
-    if not os.path.exists(token_path):
-        raise SystemExit(
-            f"Gmail token not found at {token_path}. Run: python engine/scripts/gmail_oauth_setup.py"
-        )
-    return Credentials.from_authorized_user_file(
-        token_path,
-        [
-            "https://www.googleapis.com/auth/gmail.send",
-            "https://www.googleapis.com/auth/gmail.readonly",
-            "https://www.googleapis.com/auth/gmail.compose",
-        ],
-    )
+    kind, value = _gmail_token_source()
+    if kind == "file":
+        return Credentials.from_authorized_user_file(value, GMAIL_SCOPES)
+    return Credentials.from_authorized_user_info(value, GMAIL_SCOPES)
 
 
 def _load_escalation() -> EscalationConfig:

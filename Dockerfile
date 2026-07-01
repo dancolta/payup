@@ -1,5 +1,5 @@
 # PayUp Slack bot. Socket Mode means no inbound ports: the container just needs
-# to stay alive and reach out to Slack, Wave, and Gmail.
+# to stay alive and reach out to Slack, QuickBooks, and Gmail.
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \

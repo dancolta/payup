@@ -42,7 +42,10 @@ engine/payup/
   lib/ledger.py       optional local JSONL (status view only, not authoritative).
   lib/net.py          SSRF-guarded HTTPS transport (no redirects). Choke point for
                       all non-Gmail HTTP (QuickBooks, Wave, OAuth refresh).
-  cli.py              plan-chase | send | status. Shared by skills + humans.
+  cli.py              plan-chase | send | status | validate-templates. Shared by
+                      skills + humans (validate-templates renders every tier
+                      against a synthetic invoice to check custom copy vs the
+                      guardrails; pure, offline, sends nothing).
 skills/, commands/, hooks/   Claude Code plugin surface (setup + dry-run).
 ```
 

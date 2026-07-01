@@ -2,10 +2,14 @@
 # Socket Mode = no inbound ports, so there is no [http_service] block: this is a
 # pure outbound worker. Rename `app` to something unique before `fly launch`.
 #
-# Secrets are NOT stored here. Set them with:
-#   fly secrets set WAVE_API_TOKEN=... WAVE_BUSINESS_ID=... \
-#                   SLACK_BOT_TOKEN=xoxb-... SLACK_APP_TOKEN=xapp-... \
-#                   GMAIL_TOKEN_PATH=/app/config/token.json PAYUP_LIVE=1
+# Secrets are NOT stored here. Set them with (default source is QuickBooks):
+#   fly secrets set QBO_ACCESS_TOKEN=... QBO_REALM_ID=... QBO_REFRESH_TOKEN=... \
+#                   QBO_CLIENT_ID=... QBO_CLIENT_SECRET=... \
+#                   SLACK_BOT_TOKEN=xoxb-... SLACK_APP_TOKEN=xapp-... PAYUP_LIVE=1 \
+#                   GMAIL_TOKEN_JSON="$(cat config/token.json)"
+# The Gmail token file is not baked into the image, so pass its contents as the
+# GMAIL_TOKEN_JSON secret. (US/CA on Wave instead? Swap the QBO_* set for
+# WAVE_API_TOKEN + WAVE_BUSINESS_ID and set PAYUP_SOURCE=wave.)
 
 app = "payup-bot"
 primary_region = "iad"
