@@ -231,47 +231,86 @@ def edit_session(monkeypatch, tmp_path):
     return ChaseSession(deps)
 
 
-def test_edit_template_shows_current_copy_when_no_target(edit_session):
+def test_edit_flow_asks_which_reminder(edit_session):
     out = edit_session.handle(CH, "edit template")
+    assert "Which reminder" in out
     assert "gentle" in out and "firm" in out and "final" in out
-    assert "{invoice_number}" in out  # usage mentions the required placeholder
+    assert CH in edit_session._edit  # now in edit mode
 
 
-def test_edit_template_applies_and_persists(edit_session, monkeypatch, tmp_path):
+def test_edit_flow_pick_then_paste_saves_body(edit_session, tmp_path):
+    edit_session.handle(CH, "edit template")
+    step = edit_session.handle(CH, "1")  # pick gentle
+    assert "current gentle reminder" in step.lower()
     out = edit_session.handle(
-        CH, "edit template gentle subject: Quick nudge on invoice #{invoice_number}"
+        CH, "Hey {customer_name}, quick nudge on #{invoice_number} for {amount}. Thanks, Dan"
     )
-    assert "Updated the gentle subject" in out and "Nothing was sent" in out
-    # Live in memory for the next batch.
+    assert "Saved" in out and "gentle body" in out and "Nothing was sent" in out
     ts = edit_session.deps.cfg.templating.templates
-    assert ts.gentle_subject == "Quick nudge on invoice #{invoice_number}"
-    # Persisted to the file so it survives a restart.
+    assert ts.gentle_body.startswith("Hey {customer_name}")
+    assert CH not in edit_session._edit  # flow finished
     import yaml
 
     saved = yaml.safe_load((tmp_path / "templates.yml").read_text(encoding="utf-8"))
-    assert saved["gentle"]["subject"] == "Quick nudge on invoice #{invoice_number}"
+    assert saved["gentle"]["body"].startswith("Hey {customer_name}")
 
 
-def test_edit_template_rejects_subject_without_invoice_number(edit_session, tmp_path):
-    out = edit_session.handle(CH, "edit template gentle subject: A friendly reminder")
-    assert "Did not save" in out
-    # Nothing changed: config untouched (still the default None), no file written.
-    assert edit_session.deps.cfg.templating.templates is None
+def test_edit_flow_tier_shortcut_skips_the_question(edit_session):
+    out = edit_session.handle(CH, "edit template firm")
+    assert "current firm reminder" in out.lower()
+    assert edit_session._edit[CH]["tier"] == "firm"
+
+
+def test_edit_flow_subject_line_prefix_sets_both(edit_session):
+    edit_session.handle(CH, "edit template gentle")
+    out = edit_session.handle(
+        CH, "Subject: Quick nudge on #{invoice_number}\nHi {customer_name}, please settle {amount}."
+    )
+    assert "Saved" in out and "subject and body" in out
+    ts = edit_session.deps.cfg.templating.templates
+    assert ts.gentle_subject == "Quick nudge on #{invoice_number}"
+    assert ts.gentle_body.startswith("Hi {customer_name}")
+
+
+def test_edit_flow_rejects_subject_without_invoice_number_and_stays(edit_session, tmp_path):
+    edit_session.handle(CH, "edit template gentle")
+    out = edit_session.handle(CH, "Subject: A friendly reminder")
+    assert "break a rule" in out.lower()
+    assert CH in edit_session._edit  # still editing, can retry
+    assert edit_session.deps.cfg.templating.templates is None  # nothing changed
     assert not (tmp_path / "templates.yml").exists()
 
 
-def test_edit_template_rejects_collections_language(edit_session):
+def test_edit_flow_rejects_collections_language(edit_session):
+    edit_session.handle(CH, "edit template final")
     out = edit_session.handle(
-        CH, "edit template final body: Pay now or we call a collection agency about #{invoice_number}."
+        CH, "Pay now or we call a collection agency about #{invoice_number}."
     )
-    assert "Did not save" in out
-    assert edit_session.deps.cfg.templating.templates is None
+    assert "break a rule" in out.lower()
+    assert CH in edit_session._edit
 
 
-def test_edit_template_never_sends(edit_session):
-    # Editing copy is not a send under any phrasing.
-    edit_session.handle(CH, "edit template firm body: send this reminder for #{invoice_number}")
-    # No gmail transport is configured; the fact that nothing raised and no send
-    # path ran is the guarantee. Re-editing still reports the no-send contract.
-    out = edit_session.handle(CH, "edit template")
-    assert "Nothing is ever sent" in out
+def test_edit_flow_cancel_exits(edit_session):
+    edit_session.handle(CH, "edit template")
+    out = edit_session.handle(CH, "cancel")
+    assert "cancelled" in out.lower()
+    assert CH not in edit_session._edit
+
+
+def test_edit_flow_invalid_pick_reprompts(edit_session):
+    edit_session.handle(CH, "edit template")
+    out = edit_session.handle(CH, "banana")
+    assert "1" in out and "2" in out and "3" in out
+    assert CH in edit_session._edit  # still waiting for a valid pick
+
+
+def test_edit_flow_never_sends_even_with_batch(session, monkeypatch, tmp_path):
+    # Editing while a batch exists must never send, and the pasted copy (which
+    # contains "send") must not be misread as a command.
+    monkeypatch.setenv("PAYUP_TEMPLATES_CONFIG", str(tmp_path / "templates.yml"))
+    session.refresh(CH)
+    session.handle(CH, "edit template")
+    session.handle(CH, "gentle")
+    out = session.handle(CH, "Hi {customer_name}, please send payment for #{invoice_number}. Thanks")
+    assert "Saved" in out
+    assert session._gmail.sent == []

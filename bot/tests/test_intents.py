@@ -121,38 +121,27 @@ def test_strips_slack_mention():
     assert i.kind == "send" and i.all is True
 
 
-def test_edit_template_parses_tier_field_and_copy():
-    i = parse_intent("edit template gentle subject: Quick nudge on invoice #{invoice_number}", BATCH)
-    assert i.kind == "edit_template"
-    assert i.tier == "gentle" and i.template_field == "subject"
-    assert i.template_text == "Quick nudge on invoice #{invoice_number}"
-
-
-def test_edit_template_preserves_case_and_inner_colons():
-    i = parse_intent("edit template firm body: Reminder: invoice #{invoice_number} due {due_date}", BATCH)
-    assert i.kind == "edit_template" and i.tier == "firm" and i.template_field == "body"
-    # First colon splits tier/field from copy; a colon inside the copy is kept.
-    assert i.template_text == "Reminder: invoice #{invoice_number} due {due_date}"
-
-
-def test_edit_template_copy_with_action_words_is_not_a_send():
-    # Template copy containing "send"/"all"/a number must NOT parse as a send/skip.
-    i = parse_intent("edit template final body: We will send nothing to you, {customer_name}.", BATCH)
-    assert i.kind == "edit_template" and i.template_field == "body"
-
-
-def test_bare_edit_template_has_no_payload():
+def test_edit_template_trigger_no_tier():
     i = parse_intent("edit template", BATCH)
-    assert i.kind == "edit_template"
-    assert i.tier is None and i.template_field is None and i.template_text is None
+    assert i.kind == "edit_template" and i.tier is None
 
 
-def test_edit_template_with_mention_and_plural():
-    i = parse_intent("<@U0BC> edit templates gentle subject: Nudge #{invoice_number}", BATCH)
-    assert i.kind == "edit_template" and i.tier == "gentle" and i.template_field == "subject"
+def test_edit_template_trigger_variants():
+    for phrase in ("edit templates", "edit the reminders", "change my wording", "update reminder copy"):
+        assert parse_intent(phrase, BATCH).kind == "edit_template", phrase
 
 
-def test_edit_template_without_colon_shows_usage():
-    # No colon -> no clear copy -> treated as the show/usage form, not a bad edit.
-    i = parse_intent("edit template gentle", BATCH)
-    assert i.kind == "edit_template" and i.template_text is None
+def test_edit_template_names_tier_up_front():
+    assert parse_intent("edit template gentle", BATCH).tier == "gentle"
+    assert parse_intent("edit template for the final reminder", BATCH).tier == "final"
+
+
+def test_edit_template_with_mention_prefix():
+    i = parse_intent("<@U0BC> edit template", BATCH)
+    assert i.kind == "edit_template" and i.tier is None
+
+
+def test_edit_trigger_is_never_a_send():
+    # The editor trigger must never be read as a send/chase.
+    assert parse_intent("edit the reminders", BATCH).kind == "edit_template"
+    assert parse_intent("change my reminder wording", BATCH).kind == "edit_template"

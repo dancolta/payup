@@ -19,10 +19,15 @@ _DRAFT_VERBS = ("draft",)
 _SHOW_WORDS = ("show overdue", "show", "overdue", "list", "what's overdue", "whats overdue", "status")
 _HELP_WORDS = ("help", "commands", "?", "how do i")
 
-# Reminder-copy editing: "edit template gentle subject: <new copy>".
+# Reminder-copy editing is a guided flow: "edit template" (optionally naming a
+# tier, e.g. "edit gentle") starts it; the follow-up replies with the new wording
+# are consumed conversationally by the handler, not parsed here.
 _TIERS = ("gentle", "firm", "final")
-_TEMPLATE_FIELDS = ("subject", "body")
-_EDIT_TEMPLATE_RE = re.compile(r"edit\s+templates?\b(.*)", re.IGNORECASE | re.DOTALL)
+_EDIT_TRIGGER_RE = re.compile(
+    r"\b(?:edit|change|update)\s+(?:the\s+|my\s+|our\s+)?"
+    r"(?:templates?|reminders?|wording|copy|messages?)\b(.*)",
+    re.IGNORECASE | re.DOTALL,
+)
 
 # Slack markup like <@U123>, <#C123|name>, <https://...> is stripped before
 # parsing, so an @mention prefix does not leak ids/digits into matching.
@@ -53,11 +58,10 @@ class Intent:
     kind: str  # 'send' | 'draft' | 'skip' | 'show_overdue' | 'help' | 'edit_template' | 'unknown'
     ids: tuple[int, ...] = field(default=())  # 1-based row numbers
     all: bool = False
-    # For kind == 'edit_template': which tier/field to rewrite and the new copy.
-    # All None means "no target given" -> show current copy + usage.
+    # For kind == 'edit_template': the tier named up front, if any ("edit gentle").
+    # None means "ask which one". The new copy arrives in later replies and is
+    # handled conversationally, so it is not parsed here.
     tier: str | None = None
-    template_field: str | None = None
-    template_text: str | None = None
 
 
 def _resolve_names(text: str, batch: list[dict]) -> set[int]:
@@ -80,29 +84,6 @@ def _resolve_numbers(text: str, batch: list[dict]) -> set[int]:
     return {int(m) for m in _NUM_RE.findall(text) if int(m) in valid}
 
 
-def _parse_edit_template(raw: str):
-    """Pull (tier, field, text) out of 'edit template gentle subject: <copy>'.
-
-    Reads the original-case text so the new copy keeps the user's capitalization,
-    and splits on the FIRST colon so a colon inside the copy (e.g. "Reminder:
-    ...") is preserved. Returns None when there is no clear tier + field + copy,
-    so the handler shows the current copy and usage instead of guessing."""
-    m = _EDIT_TEMPLATE_RE.search(raw)
-    if not m or ":" not in m.group(1):
-        return None
-    head, body = m.group(1).split(":", 1)
-    body = body.strip()
-    tier = fld = None
-    for tok in head.lower().split():
-        if tok in _TIERS:
-            tier = tok
-        elif tok in _TEMPLATE_FIELDS:
-            fld = tok
-    if tier and fld and body:
-        return (tier, fld, body)
-    return None
-
-
 def parse_intent(text: str, batch: list[dict] | None = None) -> Intent:
     """Parse a Slack message into an Intent. `batch` rows are dicts with at least
     {'n': int, 'customer': str} so names like "Delta" resolve to a row number."""
@@ -112,15 +93,14 @@ def parse_intent(text: str, batch: list[dict] | None = None) -> Intent:
     if not t:
         return Intent("unknown")
 
-    # Editing reminder copy is a distinct command, matched BEFORE the action-verb
-    # logic so template body text (which may contain "send", "all", numbers, or a
-    # customer name) is never misread as a send/skip/draft.
-    if "edit template" in t:
-        parsed = _parse_edit_template(raw)
-        if parsed:
-            tier, fld, body = parsed
-            return Intent("edit_template", tier=tier, template_field=fld, template_text=body)
-        return Intent("edit_template")
+    # Start the guided reminder-copy editor, matched BEFORE the action-verb logic
+    # so "edit ... reminders" is never read as a send/chase. A tier named up front
+    # ("edit gentle") is a shortcut; otherwise the handler asks which one.
+    edit = _EDIT_TRIGGER_RE.search(raw)
+    if edit:
+        tail = edit.group(1).lower()
+        tier = next((tr for tr in _TIERS if re.search(rf"\b{tr}\b", tail)), None)
+        return Intent("edit_template", tier=tier)
 
     has_send = any(t.startswith(v) or f" {v} " in f" {t} " for v in _SEND_VERBS)
     has_skip = any(t.startswith(v) or f" {v} " in f" {t} " for v in _SKIP_VERBS)

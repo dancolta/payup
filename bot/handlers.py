@@ -9,6 +9,7 @@ The HITL gate lives here: send happens ONLY on an explicit send Intent.
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import date
@@ -19,6 +20,12 @@ from payup.lib.planner import Action, PayupConfig
 from .intents import parse_intent
 
 __all__ = ["BotDeps", "ChaseSession", "HELP_TEXT"]
+
+# Strip Slack markup (@mentions, channel refs, links) from a follow-up reply so
+# an @mention prefix does not end up inside the saved template copy.
+_SLACK_MARKUP = re.compile(r"<[^>]+>")
+_CANCEL_WORDS = {"cancel", "stop", "quit", "nevermind", "never mind"}
+_TIER_LABEL = {"gentle": "first friendly nudge", "firm": "past due", "final": "last call"}
 
 HELP_TEXT = (
     "PayUp commands:\n"
@@ -96,6 +103,10 @@ class ChaseSession:
     def __init__(self, deps: BotDeps):
         self.deps = deps
         self._plans: dict[str, list] = {}
+        # Per-channel state for the guided "edit template" flow. Absent = not
+        # editing. {"tier": None} = waiting for a tier pick; {"tier": "gentle"} =
+        # waiting for the new copy for that tier.
+        self._edit: dict[str, dict] = {}
         # Bounded set of recently handled Slack event ids. Slack delivers a
         # channel @mention as BOTH an app_mention and a message event; without
         # this, "@PayUp send all" would run (and send) twice.
@@ -160,11 +171,39 @@ class ChaseSession:
         self._plans[channel] = plan
         return output.render_batch(plan, now=self.deps.now())
 
-    def _edit_template(self, intent) -> str:
-        """Change the reminder wording from Slack. Editing copy is not a send: it
-        only rewrites stored templates, and every future draft still passes the
-        render-time guardrails and still needs explicit approval to go out. So
-        there is no HITL gate here, but a bad edit is rejected before it is saved."""
+    def _edit_start(self, channel: str, tier: str | None) -> str:
+        """Enter the guided editor. With a tier already named ("edit gentle"),
+        jump straight to asking for the new copy; otherwise ask which reminder."""
+        if tier:
+            self._edit[channel] = {"tier": tier}
+            return self._prompt_for_copy(tier)
+        self._edit[channel] = {"tier": None}
+        return (
+            "Which reminder do you want to change?\n"
+            "  1. gentle   (first friendly nudge)\n"
+            "  2. firm     (past due)\n"
+            "  3. final     (last call)\n"
+            'Reply 1, 2, or 3. Say "cancel" to stop.'
+        )
+
+    def _prompt_for_copy(self, tier: str) -> str:
+        from payup.lib.templating import TemplateSet
+
+        current = self.deps.cfg.templating.templates or TemplateSet()
+        return (
+            f"Your current {tier} reminder ({_TIER_LABEL[tier]}):\n\n"
+            f"Subject: {current.subject_for(tier)}\n"
+            f"Body:\n{current.body_for(tier)}\n\n"
+            "Paste the new wording (this becomes the body). Keep the pieces in "
+            "{curly braces} so they auto-fill. To also change the subject line, put "
+            'it on a first line starting with "Subject:". Say "cancel" to stop.'
+        )
+
+    def _edit_step(self, channel: str, text: str) -> str:
+        """Handle one reply inside the guided editor: a tier pick, the new copy,
+        or a cancel. Editing copy never sends: it only rewrites stored templates,
+        which are still guardrail-checked at render time and still need explicit
+        approval to go out. A bad edit is rejected before anything is saved."""
         from dataclasses import replace
 
         from payup.lib.escalation import Tier
@@ -176,31 +215,43 @@ class ChaseSession:
             render_email,
         )
 
+        cleaned = _SLACK_MARKUP.sub(" ", text or "").strip()
+        if cleaned.lower() in _CANCEL_WORDS:
+            self._edit.pop(channel, None)
+            return "Okay, cancelled. Nothing changed."
+
+        tier = self._edit.get(channel, {}).get("tier")
+
+        # Stage 1: waiting for a tier pick.
+        if not tier:
+            low = cleaned.lower()
+            picked = None
+            for name, num in (("gentle", "1"), ("firm", "2"), ("final", "3")):
+                if low == num or re.search(rf"\b{name}\b", low):
+                    picked = name
+                    break
+            if not picked:
+                return 'Reply 1 (gentle), 2 (firm), or 3 (final). Say "cancel" to stop.'
+            self._edit[channel] = {"tier": picked}
+            return self._prompt_for_copy(picked)
+
+        # Stage 2: the reply is the new copy.
+        subject, body = self._split_subject_body(cleaned)
+        changes: dict[str, str] = {}
+        if subject:
+            changes[f"{tier}_subject"] = subject
+        if body:
+            changes[f"{tier}_body"] = body
+        if not changes:
+            return 'I did not catch any new wording. Paste the text, or say "cancel".'
+
         tmpl_cfg: TemplatingConfig = self.deps.cfg.templating
         current: TemplateSet = tmpl_cfg.templates or TemplateSet()
+        candidate = replace(current, **changes)
 
-        # No tier/field given: show the current copy and how to change it.
-        if not (intent.tier and intent.template_field and intent.template_text):
-            lines = ["Current reminder copy. Edit one field at a time:"]
-            for tier in ("gentle", "firm", "final"):
-                lines.append(f"\n{tier}")
-                lines.append(f"  subject: {current.subject_for(tier)}")
-                lines.append(f"  body: {current.body_for(tier)}")
-            lines.append(
-                '\nTo change a field, send e.g. "edit template gentle subject: '
-                'Quick nudge on invoice #{invoice_number}". Placeholders: '
-                "{customer_name} {invoice_number} {amount} {due_date} {sender_name} "
-                "{business_name}. Rules: keep {invoice_number} in the subject; no "
-                "legal/collections wording; no em dashes. Nothing is ever sent."
-            )
-            return "\n".join(lines)
-
-        tier, fld, text = intent.tier, intent.template_field, intent.template_text
-        candidate = replace(current, **{f"{tier}_{fld}": text})
-
-        # Validate against the SAME render-time guardrails the bot enforces on every
-        # draft, using a synthetic invoice. Reject before saving so a broken template
-        # can never reach a real chase (or wedge the batch build).
+        # Validate against the SAME render-time guardrails every draft passes,
+        # using a synthetic invoice. Reject before saving; stay in edit mode so the
+        # user can just try again.
         sample = Invoice(
             invoice_id="EDIT",
             invoice_number="1042",
@@ -220,25 +271,42 @@ class ChaseSession:
             render_email(sample, Tier(tier), trial)
         except TemplatingError as exc:
             return (
-                f"Did not save the {tier} {fld}: {exc}. Nothing changed. Keep "
-                "{invoice_number} in the subject, and avoid legal/collections "
-                "wording and em dashes."
+                f"That would break a rule: {exc}. Nothing saved. Try again, or say "
+                '"cancel". Keep {invoice_number} in the subject, and avoid '
+                "legal/collections wording and em dashes."
             )
 
-        # Persist so the change survives a restart, then hot-swap the in-memory
-        # config so the very next "show overdue" renders with the new copy.
-        saved = self._persist_template(tier, fld, text)
+        # Persist so it survives a restart, then hot-swap the in-memory config so
+        # the very next "show overdue" renders with the new copy.
+        saved = self._persist_template_fields(tier, changes)
         self.deps.cfg = replace(
             self.deps.cfg, templating=replace(tmpl_cfg, templates=candidate)
         )
+        self._edit.pop(channel, None)
+        what = " and ".join(key.split("_", 1)[1] for key in changes)
         tail = "" if saved else " (in memory only: the templates file was not writable)"
         return (
-            f'Updated the {tier} {fld}. It passed the guardrails and is live now. Say '
-            f'"show overdue" to see it in the next batch. Nothing was sent.{tail}'
+            f'Saved. Your {tier} {what} is updated and live. Say "show overdue" to '
+            f"see it in the next batch. Nothing was sent.{tail}"
         )
 
-    def _persist_template(self, tier: str, field_name: str, text: str) -> bool:
-        """Merge one edited field into the templates YAML file, creating it if
+    @staticmethod
+    def _split_subject_body(raw: str) -> tuple[str | None, str]:
+        """A first non-empty line starting with 'Subject:' sets the subject and the
+        rest is the body; otherwise the whole message is the body."""
+        lines = raw.split("\n")
+        for idx, line in enumerate(lines):
+            if not line.strip():
+                continue
+            if line.strip().lower().startswith("subject:"):
+                subject = line.strip()[len("subject:"):].strip()
+                body = "\n".join(lines[idx + 1:]).strip()
+                return (subject or None, body)
+            break
+        return (None, raw.strip())
+
+    def _persist_template_fields(self, tier: str, changes: dict[str, str]) -> bool:
+        """Merge the edited field(s) into the templates YAML file, creating it if
         needed. Returns True on write. Best-effort: if pyyaml is missing or the
         path is unwritable, the in-memory edit still applies for this process."""
         import os
@@ -255,7 +323,9 @@ class ChaseSession:
                     data = yaml.safe_load(fh) or {}
             except Exception:
                 data = {}
-        data.setdefault(tier, {})[field_name] = text
+        tier_block = data.setdefault(tier, {})
+        for key, val in changes.items():
+            tier_block[key.split("_", 1)[1]] = val  # gentle_subject -> subject
         try:
             with open(path, "w", encoding="utf-8") as fh:
                 yaml.safe_dump(
@@ -273,6 +343,11 @@ class ChaseSession:
                 return None
             self._seen_events.append(event_id)
 
+        # A guided template edit in progress consumes replies until it finishes or
+        # is cancelled, so the pasted copy is never re-parsed as a send/skip/etc.
+        if channel in self._edit:
+            return self._edit_step(channel, text)
+
         rows = self._rows(channel)
         intent = parse_intent(text, [{"n": r["n"], "customer": r["customer"]} for r in rows])
 
@@ -281,7 +356,7 @@ class ChaseSession:
         if intent.kind == "show_overdue":
             return self.refresh(channel)
         if intent.kind == "edit_template":
-            return self._edit_template(intent)
+            return self._edit_start(channel, intent.tier)
         if intent.kind == "unknown":
             return CLARIFY_TEXT
         if intent.kind == "skip":

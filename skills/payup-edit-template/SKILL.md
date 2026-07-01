@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Edit, Write
 
 Rewrite the three reminder tiers (gentle, firm, final) so they sound like the user, without breaking any of PayUp's safety rules. This edits `config/templates.yml` only. It touches no tokens, no secrets, and sends nothing.
 
-> For a quick one-field change the user can also do it from Slack: `@PayUp edit template gentle subject: ...`. This skill is the fuller path: it rewrites all three tiers in the user's voice in one pass.
+> For a quick change the user can also do it from Slack: `@PayUp edit template` walks them through one reminder at a time. This skill is the fuller path: it rewrites all three tiers in the user's voice in one pass.
 
 ## What you are editing
 
