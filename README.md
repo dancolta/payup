@@ -208,3 +208,7 @@ MIT. See [LICENSE](LICENSE).
 ## Contributing
 
 Issues and pull requests welcome. New behavior ships with tests, and the guardrail suite must stay green.
+
+---
+
+> Built by [NodeSparks](https://www.nodesparks.com) — we build [custom AI tools that replace SaaS subscriptions](https://www.nodesparks.com/services/ai-automation-agency). PayUp is our open-source, human-in-the-loop take on Bill.com-style dunning.
